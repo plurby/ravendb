@@ -34,6 +34,7 @@ namespace Raven.Storage.Esent
 				    CreateTransactionsTable(dbid);
 					CreateTasksTable(dbid);
 					CreateMapResultsTable(dbid);
+					CreateReduceResultsTable(dbid);
 					CreateIndexingStatsTable(dbid);
 					CreateIndexingStatsReduceTable(dbid);
 					CreateIndexingEtagsTable(dbid);
@@ -460,6 +461,82 @@ namespace Raven.Storage.Esent
 			indexDef = "+view\0\0";
 			Api.JetCreateIndex(session, tableid, "by_view", CreateIndexGrbit.IndexDisallowNull, indexDef, indexDef.Length,
 			                   80);
+
+			indexDef = "+view\0-etag\0\0";
+			Api.JetCreateIndex(session, tableid, "by_view_and_etag", CreateIndexGrbit.IndexDisallowNull, indexDef, indexDef.Length,
+							   80);
+
+			indexDef = "+reduce_key_and_view_hashed\0+reduce_group_id\0\0";
+			Api.JetCreateIndex(session, tableid, "by_reduce_key_and_view_hashed", CreateIndexGrbit.IndexDisallowNull, indexDef, indexDef.Length,
+							   80);
+		}
+
+		private void CreateReduceResultsTable(JET_DBID dbid)
+		{
+			JET_TABLEID tableid;
+			Api.JetCreateTable(session, dbid, "reduce_results", 1, 80, out tableid);
+			JET_COLUMNID columnid;
+
+			Api.JetAddColumn(session, tableid, "id", new JET_COLUMNDEF
+			{
+				coltyp = JET_coltyp.Long,
+				grbit = ColumndefGrbit.ColumnFixed | ColumndefGrbit.ColumnAutoincrement | ColumndefGrbit.ColumnNotNULL
+			}, null, 0, out columnid);
+
+			Api.JetAddColumn(session, tableid, "view", new JET_COLUMNDEF
+			{
+				cbMax = 255,
+				coltyp = JET_coltyp.Text,
+				cp = JET_CP.Unicode,
+				grbit = ColumndefGrbit.ColumnNotNULL
+			}, null, 0, out columnid);
+
+			Api.JetAddColumn(session, tableid, "reduce_key", new JET_COLUMNDEF
+			{
+				coltyp = JET_coltyp.LongText,
+				cp = JET_CP.Unicode,
+				grbit = ColumndefGrbit.None
+			}, null, 0, out columnid);
+
+			Api.JetAddColumn(session, tableid, "reduce_group_id", new JET_COLUMNDEF
+			{
+				coltyp = JET_coltyp.Long,
+				grbit = ColumndefGrbit.ColumnNotNULL
+			}, null, 0, out columnid);
+
+			Api.JetAddColumn(session, tableid, "reduce_key_and_view_hashed", new JET_COLUMNDEF
+			{
+				cbMax = 32,
+				coltyp = JET_coltyp.Binary,
+				grbit = ColumndefGrbit.ColumnNotNULL
+			}, null, 0, out columnid);
+
+			Api.JetAddColumn(session, tableid, "data", new JET_COLUMNDEF
+			{
+				coltyp = JET_coltyp.LongBinary,
+				grbit = ColumndefGrbit.ColumnTagged
+			}, null, 0, out columnid);
+
+			Api.JetAddColumn(session, tableid, "etag", new JET_COLUMNDEF
+			{
+				cbMax = 16,
+				coltyp = JET_coltyp.Binary,
+				grbit = ColumndefGrbit.ColumnNotNULL | ColumndefGrbit.ColumnFixed
+			}, null, 0, out columnid);
+
+			Api.JetAddColumn(session, tableid, "timestamp", new JET_COLUMNDEF
+			{
+				coltyp = JET_coltyp.DateTime,
+				grbit = ColumndefGrbit.ColumnNotNULL | ColumndefGrbit.ColumnFixed
+			}, null, 0, out columnid);
+
+			var indexDef = "+id\0\0";
+			Api.JetCreateIndex(session, tableid, "by_id", CreateIndexGrbit.IndexPrimary, indexDef, indexDef.Length,
+							   80);
+
+			indexDef = "+view\0\0";
+			Api.JetCreateIndex(session, tableid, "by_view", CreateIndexGrbit.IndexDisallowNull, indexDef, indexDef.Length,
+							   80);
 
 			indexDef = "+view\0-etag\0\0";
 			Api.JetCreateIndex(session, tableid, "by_view_and_etag", CreateIndexGrbit.IndexDisallowNull, indexDef, indexDef.Length,

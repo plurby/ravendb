@@ -12,10 +12,12 @@ namespace Raven.Database.Storage
 	public interface IMappedResultsStorageAction
 	{
 		void PutMappedResult(string view, string docId, string reduceKey, RavenJObject data, byte[] viewAndReduceKeyHashed, int reduceGroupId);
-		IEnumerable<RavenJObject> GetMappedResults(params GetMappedResultsParams[] getMappedResultsParams);
+		IEnumerable<RavenJObject> GetMappedResults(params GetMapReduceResults[] getMapReduceResults);
 		IEnumerable<string> DeleteMappedResultsForDocumentId(string documentId, string view);
 		void DeleteMappedResultsForView(string view);
 		IEnumerable<MappedResultInfo> GetMappedResultsReduceKeysAfter(string indexName, Guid lastReducedEtag, bool loadData);
+		void PutReduceResult(string view, string reduceKey, RavenJObject data, byte[] viewAndReduceKeyHashed, int reduceGroupId);
+		IEnumerable<RavenJObject> GetReduceResults(IEnumerable<GetMapReduceResults> getMapReduceResults);
 	}
 
 	public class MappedResultInfo

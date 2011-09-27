@@ -2,9 +2,9 @@
 
 namespace Raven.Database.Storage
 {
-	public class GetMappedResultsParams
+	public class GetMapReduceResults
 	{
-		public GetMappedResultsParams(string view, ReduceKeyAndGroupId reduceKey, byte[] viewAndReduceKeyHashed)
+		public GetMapReduceResults(string view, ReduceKeyAndGroupId reduceKey, byte[] viewAndReduceKeyHashed)
 		{
 			View = view;
 			ReduceKey = reduceKey;

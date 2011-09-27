@@ -46,7 +46,7 @@ namespace Raven.Database.Tasks
 			context.TransactionaStorage.Batch(actions =>
 			{
 				var itemsToFind = ReduceKeys
-					.Select(reduceKey => new GetMappedResultsParams(Index, reduceKey, MapReduceIndex.ComputeHash(Index, reduceKey.ReduceKey)))
+					.Select(reduceKey => new GetMapReduceResults(Index, reduceKey, MapReduceIndex.ComputeHash(Index, reduceKey.ReduceKey)))
 					.OrderBy(x=>x.ViewAndReduceKeyHashed, new ByteComparer())
 					.ToArray();
 

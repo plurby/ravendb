@@ -98,7 +98,7 @@ select new {
 	                PageSize = 10
 	            });
 	            if (q.IsStale)
-	                Thread.Sleep(100);
+	                Thread.Sleep(1000);
 	        } while (q.IsStale && count++ < 100);
 	    	foreach (var result in q.Results)
 	    	{

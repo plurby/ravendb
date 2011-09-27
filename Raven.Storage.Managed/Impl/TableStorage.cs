@@ -51,6 +51,12 @@ namespace Raven.Storage.Managed.Impl
 				{"ByViewAndEtag", x => Tuple.Create(x.Value<string>("view"), new ReverseComparableByteArrayWhichIgnoresNull(x.Value<byte[]>("etag")))}
 			});
 
+			ReduceResults = Add(new Table("ReduceResults")
+			{
+				{"ByViewAndReduceKey", x => Tuple.Create(x.Value<string>("view"), x.Value<string>("reduceKey"), x.Value<int>("reduceGroupId"))},
+				{"ByViewAndEtag", x => Tuple.Create(x.Value<string>("view"), new ReverseComparableByteArrayWhichIgnoresNull(x.Value<byte[]>("etag")))}
+			});
+
 			Queues = Add(new Table(x => new RavenJObject
 			{
 				{"name", x.Value<string>("name")},
@@ -78,6 +84,7 @@ namespace Raven.Storage.Managed.Impl
 		public Table Queues { get; private set; }
 
 		public Table MappedResults { get; private set; }
+		public Table ReduceResults { get; private set; }
 
 		public Table IndexingStats { get; private set; }
 

@@ -96,6 +96,9 @@ namespace Raven.Storage.Esent.StorageActions
 			if (mappedResults != null)
 				mappedResults.Dispose();
 
+			if(reduceResults != null)
+				reduceResults.Dispose();
+
 			if (indexesStats != null)
 				indexesStats.Dispose();
 

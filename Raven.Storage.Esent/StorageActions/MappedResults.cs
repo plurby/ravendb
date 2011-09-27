@@ -36,10 +36,28 @@ namespace Raven.Storage.Esent.StorageActions
 			}
 		}
 
-		public IEnumerable<RavenJObject> GetMappedResults(params GetMappedResultsParams[] getMappedResultsParams)
+		public void PutReduceResult(string view, string reduceKey, RavenJObject data, byte[] viewAndReduceKeyHashed, int reduceGroupId)
+		{
+			Guid etag = uuidGenerator.CreateSequentialUuid();
+
+			using (var update = new Update(session, ReduceResults, JET_prep.Insert))
+			{
+				Api.SetColumn(session, ReduceResults, tableColumnsCache.ReduceResultsColumns["view"], view, Encoding.Unicode);
+				Api.SetColumn(session, ReduceResults, tableColumnsCache.ReduceResultsColumns["reduce_group_id"], reduceGroupId);
+				Api.SetColumn(session, ReduceResults, tableColumnsCache.ReduceResultsColumns["reduce_key"], reduceKey, Encoding.Unicode);
+				Api.SetColumn(session, ReduceResults, tableColumnsCache.ReduceResultsColumns["reduce_key_and_view_hashed"], viewAndReduceKeyHashed);
+				Api.SetColumn(session, ReduceResults, tableColumnsCache.ReduceResultsColumns["data"], data.ToBytes());
+				Api.SetColumn(session, ReduceResults, tableColumnsCache.ReduceResultsColumns["etag"], etag.TransformToValueForEsentSorting());
+				Api.SetColumn(session, ReduceResults, tableColumnsCache.ReduceResultsColumns["timestamp"], SystemTime.Now);
+
+				update.Save();
+			}
+		}
+
+		public IEnumerable<RavenJObject> GetMappedResults(params GetMapReduceResults[] getMapReduceResults)
 		{
 			Api.JetSetCurrentIndex(session, MappedResults, "by_reduce_key_and_view_hashed");
-			foreach (var item in getMappedResultsParams)
+			foreach (var item in getMapReduceResults)
 			{
 				Api.MakeKey(session, MappedResults, item.ViewAndReduceKeyHashed, MakeKeyGrbit.NewKey);
 				Api.MakeKey(session, MappedResults, item.ReduceKey.ReduceGroupId, MakeKeyGrbit.None);
@@ -66,6 +84,33 @@ namespace Raven.Storage.Esent.StorageActions
 					
 					yield return Api.RetrieveColumn(session, MappedResults, tableColumnsCache.MappedResultsColumns["data"]).ToJObject();
 				} while (Api.TryMoveNext(session, MappedResults));
+			}
+		}
+
+		public IEnumerable<RavenJObject> GetReduceResults(IEnumerable<GetMapReduceResults> getMapReduceResults)
+		{
+			Api.JetSetCurrentIndex(session, ReduceResults, "by_reduce_key_and_view_hashed");
+			foreach (var item in getMapReduceResults)
+			{
+				Api.MakeKey(session, ReduceResults, item.ViewAndReduceKeyHashed, MakeKeyGrbit.NewKey);
+				if (Api.TrySeek(session, ReduceResults, SeekGrbit.SeekEQ) == false)
+					continue;
+
+				Api.MakeKey(session, ReduceResults, item.ViewAndReduceKeyHashed, MakeKeyGrbit.NewKey);
+				Api.JetSetIndexRange(session, ReduceResults, SetIndexRangeGrbit.RangeUpperLimit | SetIndexRangeGrbit.RangeInclusive);
+				do
+				{
+					// we need to check that we don't have hash collisions
+					var currentReduceKey = Api.RetrieveColumnAsString(session, ReduceResults, tableColumnsCache.ReduceResultsColumns["reduce_key"]);
+					if (currentReduceKey != item.ReduceKey.ReduceKey)
+						continue;
+
+					var currentView = Api.RetrieveColumnAsString(session, ReduceResults, tableColumnsCache.ReduceResultsColumns["view"]);
+					if (currentView != item.View)
+						continue;
+
+					yield return Api.RetrieveColumn(session, ReduceResults, tableColumnsCache.ReduceResultsColumns["data"]).ToJObject();
+				} while (Api.TryMoveNext(session, ReduceResults));
 			}
 		}
 
@@ -132,6 +177,7 @@ namespace Raven.Storage.Esent.StorageActions
 	        		ReduceKey = Api.RetrieveColumnAsString(session, MappedResults, tableColumnsCache.MappedResultsColumns["reduce_key"]),
 	        		Etag = new Guid(Api.RetrieveColumn(session, MappedResults, tableColumnsCache.MappedResultsColumns["etag"])),
 	        		Timestamp = Api.RetrieveColumnAsDateTime(session, MappedResults, tableColumnsCache.MappedResultsColumns["timestamp"]).Value,
+					ReduceGroupId = Api.RetrieveColumnAsInt32(session, MappedResults, tableColumnsCache.MappedResultsColumns["reduce_group_id"]).Value,
 	        	};
 				if (loadData)
 					result.Data = Api.RetrieveColumn(session, MappedResults, tableColumnsCache.MappedResultsColumns["data"]).ToJObject();

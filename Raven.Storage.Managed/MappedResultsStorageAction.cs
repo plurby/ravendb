@@ -45,12 +45,12 @@ namespace Raven.Storage.Managed
 			storage.MappedResults.Put(key, ms.ToArray());
 		}
 
-		public IEnumerable<RavenJObject> GetMappedResults(params GetMappedResultsParams[] getMappedResultsParams)
+		public IEnumerable<RavenJObject> GetMappedResults(params GetMapReduceResults[] getMappedResultsParams)
 		{
 			return getMappedResultsParams.SelectMany(GetMappedResults);
 		}
 
-		public IEnumerable<RavenJObject> GetMappedResults(GetMappedResultsParams getMappedResultsParams)
+		public IEnumerable<RavenJObject> GetMappedResults(GetMapReduceResults getMappedResultsParams)
 		{
 			return storage.MappedResults["ByViewAndReduceKey"].SkipTo(new RavenJObject
 			{
@@ -58,7 +58,8 @@ namespace Raven.Storage.Managed
 				{"reduceKey", getMappedResultsParams.ReduceKey.ReduceKey},
 				{"reduceGroupId", getMappedResultsParams.ReduceKey.ReduceGroupId}
 		}).TakeWhile(x => StringComparer.InvariantCultureIgnoreCase.Equals(x.Value<string>("view"), getMappedResultsParams.View) &&
-							  StringComparer.InvariantCultureIgnoreCase.Equals(x.Value<string>("reduceKey"), getMappedResultsParams.ReduceKey))
+							  StringComparer.InvariantCultureIgnoreCase.Equals(x.Value<string>("reduceKey"), getMappedResultsParams.ReduceKey.ReduceKey) &&
+							  x.Value<int>("reduceGroupId") == getMappedResultsParams.ReduceKey.ReduceGroupId)
 				.Select(x =>
 				{
 					var readResult = storage.MappedResults.Read(x);
@@ -85,7 +86,7 @@ namespace Raven.Storage.Managed
 
 		public void DeleteMappedResultsForView(string view)
 		{
-			foreach (var key in storage.MappedResults["ByViewAndReduceKey"].SkipTo(new RavenJObject{{"view", view}})
+			foreach (var key in storage.MappedResults["ByViewAndReduceKey"].SkipTo(new RavenJObject { { "view", view } })
 			.TakeWhile(x => StringComparer.InvariantCultureIgnoreCase.Equals(x.Value<string>("view"), view)))
 			{
 				storage.MappedResults.Remove(key);
@@ -97,7 +98,7 @@ namespace Raven.Storage.Managed
 			return storage.MappedResults["ByViewAndEtag"]
 				// the index is sorted view ascending and then etag descending
 				// we index before this index, then backward toward the last one.
-				.SkipBefore(new RavenJObject { { "view", indexName }, {"etag", lastReducedEtag.ToByteArray()}})
+				.SkipBefore(new RavenJObject { { "view", indexName }, { "etag", lastReducedEtag.ToByteArray() } })
 				.TakeWhile(x => StringComparer.InvariantCultureIgnoreCase.Equals(x.Value<string>("view"), indexName))
 				.Select(key =>
 				{
@@ -106,8 +107,9 @@ namespace Raven.Storage.Managed
 						ReduceKey = key.Value<string>("reduceKey"),
 						Etag = new Guid(key.Value<byte[]>("etag")),
 						Timestamp = key.Value<DateTime>("timestamp"),
+						ReduceGroupId = key.Value<int>("reduceGroupId")
 					};
-					if(loadData)
+					if (loadData)
 					{
 						var readResult = storage.MappedResults.Read(key);
 						if (readResult != null)
@@ -115,6 +117,46 @@ namespace Raven.Storage.Managed
 					}
 					return mappedResultInfo;
 				});
+		}
+
+		public void PutReduceResult(string view, string reduceKey, RavenJObject data, byte[] viewAndReduceKeyHashed, int reduceGroupId)
+		{
+			var ms = new MemoryStream();
+			data.WriteTo(ms);
+			var byteArray = generator.CreateSequentialUuid().ToByteArray();
+			var key = new RavenJObject
+			{
+				{"view", view},
+				{"reduceKey", reduceKey},
+				{"etag", byteArray},
+				{"timestamp", SystemTime.Now},
+				{"reduceGroupId", reduceGroupId}
+			};
+			storage.ReduceResults.Put(key, ms.ToArray());
+		}
+
+		public IEnumerable<RavenJObject> GetReduceResults(IEnumerable<GetMapReduceResults> getMapReduceResults)
+		{
+			return getMapReduceResults.SelectMany(GetReduceResults);
+		}
+
+
+		public IEnumerable<RavenJObject> GetReduceResults(GetMapReduceResults getMappedResultsParams)
+		{
+			return storage.ReduceResults["ByViewAndReduceKey"].SkipTo(new RavenJObject
+			{
+				{"view", getMappedResultsParams.View},
+				{"reduceKey", getMappedResultsParams.ReduceKey.ReduceKey},
+		}).TakeWhile(x => StringComparer.InvariantCultureIgnoreCase.Equals(x.Value<string>("view"), getMappedResultsParams.View) &&
+							  StringComparer.InvariantCultureIgnoreCase.Equals(x.Value<string>("reduceKey"), getMappedResultsParams.ReduceKey.ReduceKey))
+				.Select(x =>
+				{
+					var readResult = storage.MappedResults.Read(x);
+					if (readResult == null)
+						return null;
+					return readResult.Data().ToJObject();
+				}).Where(x => x != null);
+
 		}
 	}
 }

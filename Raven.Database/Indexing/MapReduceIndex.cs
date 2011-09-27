@@ -89,7 +89,7 @@ namespace Raven.Database.Indexing
 						ReduceKey = reduceKey
 					});
 
-					var data = GetMapedData(doc);
+					var data = IndexingResultToJson(doc);
 
 					logIndexing.Debug("Mapped result for '{0}': '{1}'", name, data);
 
@@ -165,7 +165,7 @@ namespace Raven.Database.Indexing
 			}
 		}
 
-		private static RavenJObject GetMapedData(object doc)
+		private static RavenJObject IndexingResultToJson(object doc)
 		{
 			if (doc is DynamicJsonObject)
 				return ((DynamicJsonObject)doc).Inner;
@@ -202,12 +202,13 @@ namespace Raven.Database.Indexing
 
 		public static int ComputeReduceGroupId(string documentId)
 		{
-			using (var sha256 = SHA256.Create())
-			{
-				var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(documentId));
+			//using (var sha256 = SHA256.Create())
+			//{
+			//    var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(documentId));
 
-				return Math.Abs(BitConverter.ToInt32(hash, 0))%4096;
-			}
+			//    return Math.Abs(BitConverter.ToInt32(hash, 0))%4096;
+			//}
+			return -1;
 		}
 
 		private static string ReduceKeyToString(object reduceValue)
@@ -284,10 +285,9 @@ namespace Raven.Database.Indexing
 				// reduce and save all the groups
 				foreach (var doc in RobustEnumerationReduce(mappedResults, viewGenerator.ReduceDefinition, actions, context))
 				{
-					// how do I decide how to do this? 
-					// based on what?
 					string reduceKeyAsString = ExtractReduceKey(viewGenerator, doc);
-					actions.MappedResults.PutReduceResult(reduceKeyAsString, );
+					const int reduceGroupId = -1;
+					actions.MappedResults.PutReduceResult(name, reduceKeyAsString, IndexingResultToJson(doc),ComputeHash(name, reduceKeyAsString), reduceGroupId);
 				}
 
 				PropertyDescriptorCollection properties = null;
@@ -295,7 +295,12 @@ namespace Raven.Database.Indexing
 				var luceneDoc = new Document();
 				var reduceKeyField = new Field(Abstractions.Data.Constants.ReduceKeyFieldName, "dummy",
 				                      Field.Store.NO, Field.Index.NOT_ANALYZED_NO_NORMS);
-				foreach (var doc in RobustEnumerationReduce(mappedResults, viewGenerator.ReduceDefinition, actions, context))
+
+				// reduce all the items in all the groups for all the reduce keys found
+				var reduceResults =
+					actions.MappedResults.GetReduceResults(
+						reduceKeys.Select(x => new GetMapReduceResults(name, x, ComputeHash(name, x.ReduceKey)))).ToArray();
+				foreach (var doc in RobustEnumerationReduce(reduceResults, viewGenerator.ReduceDefinition, actions, context))
 				{
 					count++;
 					var fields = GetFields(anonymousObjectToLuceneDocumentConverter, doc, ref properties).ToList();

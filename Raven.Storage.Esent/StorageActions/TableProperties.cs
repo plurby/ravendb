@@ -76,6 +76,13 @@ namespace Raven.Storage.Esent.StorageActions
 			get { return mappedResults ?? (mappedResults = new Table(session, dbid, "mapped_results", OpenTableGrbit.None)); }
 		}
 
+
+		private Table reduceResults;
+		protected Table ReduceResults
+		{
+			get { return reduceResults ?? (reduceResults = new Table(session, dbid, "reduce_results", OpenTableGrbit.None)); }
+		}
+
 		private Table tasks;
 
 		protected Table Tasks
