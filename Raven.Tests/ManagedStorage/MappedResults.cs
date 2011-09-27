@@ -17,7 +17,7 @@ namespace Raven.Tests.ManagedStorage
 		{
 			using (var tx = NewTransactionalStorage())
 			{
-				tx.Batch(mutator => mutator.MappedResults.PutMappedResult("test", "users/ayende","ayende", RavenJObject.FromObject(new { Name = "Rahien" }), null));
+				tx.Batch(mutator => mutator.MappedResults.PutMappedResult("test", "users/ayende","ayende", RavenJObject.FromObject(new { Name = "Rahien" }), null, -1));
 
 				tx.Batch(viewer => Assert.NotEmpty(viewer.MappedResults.GetMappedResults(new GetMappedResultsParams("test", "ayende", null))));
 			}
@@ -28,7 +28,7 @@ namespace Raven.Tests.ManagedStorage
 		{
 			using (var tx = NewTransactionalStorage())
 			{
-				tx.Batch(mutator => mutator.MappedResults.PutMappedResult("test", "users/ayende", "ayende", RavenJObject.FromObject(new { Name = "Rahien" }), null));
+				tx.Batch(mutator => mutator.MappedResults.PutMappedResult("test", "users/ayende", "ayende", RavenJObject.FromObject(new { Name = "Rahien" }), null, -1));
 				tx.Batch(mutator => Assert.NotEmpty(mutator.MappedResults.DeleteMappedResultsForDocumentId("users/ayende","test")));
 
 				tx.Batch(viewer => Assert.Empty(viewer.MappedResults.GetMappedResults(new GetMappedResultsParams("test", "ayende", null))));
@@ -40,7 +40,7 @@ namespace Raven.Tests.ManagedStorage
 		{
 			using (var tx = NewTransactionalStorage())
 			{
-				tx.Batch(mutator => mutator.MappedResults.PutMappedResult("test", "users/ayende", "ayende", RavenJObject.FromObject(new { Name = "Rahien" }), null));
+				tx.Batch(mutator => mutator.MappedResults.PutMappedResult("test", "users/ayende", "ayende", RavenJObject.FromObject(new { Name = "Rahien" }), null, -1));
 				tx.Batch(mutator => mutator.MappedResults.DeleteMappedResultsForView("test"));
 
 				tx.Batch(viewer => Assert.Empty(viewer.MappedResults.GetMappedResults(new GetMappedResultsParams("test", "ayende", null))));
@@ -52,8 +52,8 @@ namespace Raven.Tests.ManagedStorage
 		{
 			using (var tx = NewTransactionalStorage())
 			{
-				tx.Batch(mutator => mutator.MappedResults.PutMappedResult("test", "users/ayende", "ayende", RavenJObject.FromObject(new { Name = "Rahien" }), null));
-				tx.Batch(mutator => mutator.MappedResults.PutMappedResult("test", "users/ayende", "ayende", RavenJObject.FromObject(new { Name = "Rahien" }), null));
+				tx.Batch(mutator => mutator.MappedResults.PutMappedResult("test", "users/ayende", "ayende", RavenJObject.FromObject(new { Name = "Rahien" }), null, -1));
+				tx.Batch(mutator => mutator.MappedResults.PutMappedResult("test", "users/ayende", "ayende", RavenJObject.FromObject(new { Name = "Rahien" }), null, -1));
 
 				tx.Batch(viewer => Assert.Equal(2, viewer.MappedResults.GetMappedResults(new GetMappedResultsParams("test", "ayende", null)).Count()));
 			}
@@ -67,9 +67,9 @@ namespace Raven.Tests.ManagedStorage
 				tx.Batch(mutator =>
 				{
 					mutator.MappedResults.PutMappedResult("test", "users/ayende", "ayende", RavenJObject.FromObject(new {Name = "Rahien"}),
-					                                      null);
+														  null, -1);
 					mutator.MappedResults.PutMappedResult("test", "users/rahien", "ayende", RavenJObject.FromObject(new { Name = "Rahien" }),
-														  null);
+														  null, -1);
 				});
 
 				tx.Batch(viewer => Assert.Equal(2, viewer.MappedResults.GetMappedResults(new GetMappedResultsParams("test", "ayende", null)).Count()));

@@ -28,7 +28,7 @@ namespace Raven.Storage.Managed
 			this.generator = generator;
 		}
 
-		public void PutMappedResult(string view, string docId, string reduceKey, RavenJObject data, byte[] viewAndReduceKeyHashed)
+		public void PutMappedResult(string view, string docId, string reduceKey, RavenJObject data, byte[] viewAndReduceKeyHashed, int reduceGroupId)
 		{
 			var ms = new MemoryStream();
 			data.WriteTo(ms);
@@ -39,7 +39,8 @@ namespace Raven.Storage.Managed
 				{"reduceKey", reduceKey},
 				{"docId", docId},
 				{"etag", byteArray},
-				{"timestamp", SystemTime.Now}
+				{"timestamp", SystemTime.Now},
+				{"reduceGroupId", reduceGroupId}
 			};
 			storage.MappedResults.Put(key, ms.ToArray());
 		}

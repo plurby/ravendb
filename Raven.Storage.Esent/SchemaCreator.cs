@@ -12,7 +12,7 @@ namespace Raven.Storage.Esent
 	[CLSCompliant(false)]
 	public class SchemaCreator
 	{
-		public const string SchemaVersion = "3.6";
+		public const string SchemaVersion = "3.7";
 		private readonly Session session;
 
 		public SchemaCreator(Session session)
@@ -416,6 +416,12 @@ namespace Raven.Storage.Esent
 				grbit = ColumndefGrbit.None
 			}, null, 0, out columnid);
 
+			Api.JetAddColumn(session, tableid, "reduce_group_id", new JET_COLUMNDEF
+			{
+				coltyp = JET_coltyp.Long,
+				grbit = ColumndefGrbit.ColumnNotNULL
+			}, null, 0, out columnid);
+
 			Api.JetAddColumn(session, tableid, "reduce_key_and_view_hashed", new JET_COLUMNDEF
 			{
 				cbMax = 32,
@@ -459,7 +465,7 @@ namespace Raven.Storage.Esent
 			Api.JetCreateIndex(session, tableid, "by_view_and_etag", CreateIndexGrbit.IndexDisallowNull, indexDef, indexDef.Length,
 							   80);
 
-			indexDef = "+reduce_key_and_view_hashed\0\0";
+			indexDef = "+reduce_key_and_view_hashed\0+reduce_group_id\0\0";
 			Api.JetCreateIndex(session, tableid, "by_reduce_key_and_view_hashed", CreateIndexGrbit.IndexDisallowNull, indexDef, indexDef.Length,
 							   80);
 		}

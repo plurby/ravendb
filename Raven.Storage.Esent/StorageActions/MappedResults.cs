@@ -9,7 +9,6 @@ using System.Text;
 using Microsoft.Isam.Esent.Interop;
 using Raven.Abstractions;
 using Raven.Abstractions.Extensions;
-using Raven.Database.Json;
 using Raven.Database.Extensions;
 using Raven.Database.Storage;
 using Raven.Json.Linq;
@@ -18,13 +17,14 @@ namespace Raven.Storage.Esent.StorageActions
 {
 	public partial class DocumentStorageActions : IMappedResultsStorageAction
 	{
-		public void PutMappedResult(string view, string docId, string reduceKey, RavenJObject data, byte[] viewAndReduceKeyHashed)
+		public void PutMappedResult(string view, string docId, string reduceKey, RavenJObject data, byte[] viewAndReduceKeyHashed, int reduceGroupId)
 		{
 	        Guid etag = uuidGenerator.CreateSequentialUuid();
 
 			using (var update = new Update(session, MappedResults, JET_prep.Insert))
 			{
 				Api.SetColumn(session, MappedResults, tableColumnsCache.MappedResultsColumns["view"], view, Encoding.Unicode);
+				Api.SetColumn(session, MappedResults, tableColumnsCache.MappedResultsColumns["reduce_group_id"], reduceGroupId);
 				Api.SetColumn(session, MappedResults, tableColumnsCache.MappedResultsColumns["document_key"], docId, Encoding.Unicode);
 				Api.SetColumn(session, MappedResults, tableColumnsCache.MappedResultsColumns["reduce_key"], reduceKey, Encoding.Unicode);
 				Api.SetColumn(session, MappedResults, tableColumnsCache.MappedResultsColumns["reduce_key_and_view_hashed"], viewAndReduceKeyHashed);

@@ -86,7 +86,7 @@ namespace Raven.Database.Indexing
 
 					var hash = ComputeHash(name, reduceKey);
 
-					actions.MappedResults.PutMappedResult(name, docId, reduceKey, data, hash);
+					actions.MappedResults.PutMappedResult(name, docId, reduceKey, data, hash, ComputeReduceGroupId(docId));
 
 					actions.Indexing.IncrementSuccessIndexing();
 				}
@@ -189,6 +189,16 @@ namespace Raven.Database.Indexing
 		{
 			using (var sha256 = SHA256.Create())
 				return sha256.ComputeHash(Encoding.UTF8.GetBytes(name + "/" + reduceKey));
+		}
+
+		public static int ComputeReduceGroupId(string documentId)
+		{
+			using (var sha256 = SHA256.Create())
+			{
+				var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(documentId));
+
+				return Math.Abs(BitConverter.ToInt32(hash, 0))%4096;
+			}
 		}
 
 		private static string ReduceKeyToString(object reduceValue)
