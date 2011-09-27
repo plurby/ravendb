@@ -21,6 +21,7 @@ namespace Raven.Database.Storage
 	public class MappedResultInfo
 	{
 		public string ReduceKey { get; set; }
+		public int ReduceGroupId { get; set; }
 		public DateTime Timestamp { get; set; }
 		public Guid Etag { get; set; }
 

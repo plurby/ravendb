@@ -17,12 +17,7 @@ namespace Raven.Database.Tasks
 	{
 		private static readonly Logger log = LogManager.GetCurrentClassLogger();
 
-		public string[] ReduceKeys { get; set; }
-
-		public ReduceTask()
-		{
-			
-		}
+		public ReduceKeyAndGroupId[] ReduceKeys { get; set; }
 
 		public override bool SupportsMerging
 		{
@@ -51,9 +46,10 @@ namespace Raven.Database.Tasks
 			context.TransactionaStorage.Batch(actions =>
 			{
 				var itemsToFind = ReduceKeys
-					.Select(reduceKey => new GetMappedResultsParams(Index, reduceKey, MapReduceIndex.ComputeHash(Index, reduceKey)))
+					.Select(reduceKey => new GetMappedResultsParams(Index, reduceKey, MapReduceIndex.ComputeHash(Index, reduceKey.ReduceKey)))
 					.OrderBy(x=>x.ViewAndReduceKeyHashed, new ByteComparer())
 					.ToArray();
+
 				var mappedResults = actions.MappedResults.GetMappedResults(itemsToFind)
 					.Select(JsonToExpando.Convert);
 				

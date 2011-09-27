@@ -1,31 +1,20 @@
-﻿namespace Raven.Database.Storage
+﻿using Raven.Database.Indexing;
+
+namespace Raven.Database.Storage
 {
 	public class GetMappedResultsParams
 	{
-		private readonly string view;
-		private readonly string reduceKey;
-		private readonly byte[] viewAndReduceKeyHashed;
-
-		public GetMappedResultsParams(string view, string reduceKey, byte[] viewAndReduceKeyHashed)
+		public GetMappedResultsParams(string view, ReduceKeyAndGroupId reduceKey, byte[] viewAndReduceKeyHashed)
 		{
-			this.view = view;
-			this.reduceKey = reduceKey;
-			this.viewAndReduceKeyHashed = viewAndReduceKeyHashed;
+			View = view;
+			ReduceKey = reduceKey;
+			ViewAndReduceKeyHashed = viewAndReduceKeyHashed;
 		}
 
-		public string View
-		{
-			get { return view; }
-		}
+		public string View { get; private set; }
 
-		public string ReduceKey
-		{
-			get { return reduceKey; }
-		}
+		public ReduceKeyAndGroupId ReduceKey { get; private set; }
 
-		public byte[] ViewAndReduceKeyHashed
-		{
-			get { return viewAndReduceKeyHashed; }
-		}
+		public byte[] ViewAndReduceKeyHashed { get; private set; }
 	}
 }

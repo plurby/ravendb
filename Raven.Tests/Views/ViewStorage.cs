@@ -1,3 +1,4 @@
+#if DONE
 //-----------------------------------------------------------------------
 // <copyright file="ViewStorage.cs" company="Hibernating Rhinos LTD">
 //     Copyright (c) Hibernating Rhinos LTD. All rights reserved.
@@ -174,3 +175,4 @@ namespace Raven.Tests.Views
 		}
 	}
 }
+#endif

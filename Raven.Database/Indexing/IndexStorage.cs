@@ -267,7 +267,7 @@ namespace Raven.Database.Indexing
 		}
 
 		public void Reduce(string index, AbstractViewGenerator viewGenerator, IEnumerable<object> mappedResults,
-						   WorkContext context, IStorageActionsAccessor actions, string[] reduceKeys)
+						   WorkContext context, IStorageActionsAccessor actions, ReduceKeyAndGroupId[] reduceKeys)
 		{
 			Index value;
 			if (indexes.TryGetValue(index, out value) == false)

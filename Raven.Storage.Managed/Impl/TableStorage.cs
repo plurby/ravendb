@@ -46,7 +46,7 @@ namespace Raven.Storage.Managed.Impl
 
 			MappedResults = Add(new Table("MappedResults")
 			{
-				{"ByViewAndReduceKey", x => Tuple.Create(x.Value<string>("view"), x.Value<string>("reduceKey"))},
+				{"ByViewAndReduceKey", x => Tuple.Create(x.Value<string>("view"), x.Value<string>("reduceKey"), x.Value<int>("reduceGroupId"))},
 				{"ByViewAndDocumentId", x => Tuple.Create(x.Value<string>("view"), x.Value<string>("docId"))},
 				{"ByViewAndEtag", x => Tuple.Create(x.Value<string>("view"), new ReverseComparableByteArrayWhichIgnoresNull(x.Value<byte[]>("etag")))}
 			});

@@ -1,3 +1,4 @@
+#if DONE
 //-----------------------------------------------------------------------
 // <copyright file="MappedResults.cs" company="Hibernating Rhinos LTD">
 //     Copyright (c) Hibernating Rhinos LTD. All rights reserved.
@@ -77,3 +78,4 @@ namespace Raven.Tests.ManagedStorage
 		}
 	}
 }
+#endif

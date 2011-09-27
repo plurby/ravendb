@@ -37,10 +37,13 @@ namespace Raven.Database.Indexing
 							log.Debug("No reduce keys found for {0}", indexToWorkOn.IndexName);
 					}
 
+					var reduceKeyAndGroupIds =
+						reduceKeyAndEtags.Select(x => new ReduceKeyAndGroupId {ReduceKey = x.ReduceKey, ReduceGroupId = x.ReduceGroupId}).
+							Distinct().ToArray();
 					new ReduceTask
 					{
 						Index = indexToWorkOn.IndexName,
-						ReduceKeys = reduceKeyAndEtags.Select(x => x.ReduceKey).Distinct().ToArray(),
+						ReduceKeys = reduceKeyAndGroupIds,
 					}.Execute(context);
 				});
 			}

@@ -55,7 +55,8 @@ namespace Raven.Storage.Managed
 			return storage.MappedResults["ByViewAndReduceKey"].SkipTo(new RavenJObject
 			{
 				{"view", getMappedResultsParams.View},
-				{"reduceKey", getMappedResultsParams.ReduceKey}
+				{"reduceKey", getMappedResultsParams.ReduceKey.ReduceKey},
+				{"reduceGroupId", getMappedResultsParams.ReduceKey.ReduceGroupId}
 		}).TakeWhile(x => StringComparer.InvariantCultureIgnoreCase.Equals(x.Value<string>("view"), getMappedResultsParams.View) &&
 							  StringComparer.InvariantCultureIgnoreCase.Equals(x.Value<string>("reduceKey"), getMappedResultsParams.ReduceKey))
 				.Select(x =>

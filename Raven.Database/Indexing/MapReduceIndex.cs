@@ -22,6 +22,7 @@ using Raven.Abstractions.Linq;
 using Raven.Database.Data;
 using Raven.Database.Extensions;
 using Raven.Database.Linq;
+using Raven.Database.Plugins;
 using Raven.Database.Storage;
 using Raven.Database.Tasks;
 using Raven.Json.Linq;
@@ -53,13 +54,17 @@ namespace Raven.Database.Indexing
 			// we mark the reduce keys to delete when we delete the mapped results, then we remove
 			// any reduce key that is actually being used to generate new mapped results
 			// this way, only reduces that removed data will force us to use the tasks approach
-			var reduceKeysToDelete = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
+			var reduceKeysToDelete = new HashSet<ReduceKeyAndGroupId>();
 			var documentsWrapped = documents.Select(doc =>
 			{
 				var documentId = doc.__document_id;
 				foreach (var reduceKey in actions.MappedResults.DeleteMappedResultsForDocumentId((string)documentId, name))
 				{
-					reduceKeysToDelete.Add(reduceKey);
+					reduceKeysToDelete.Add(new ReduceKeyAndGroupId
+					{
+						ReduceGroupId = ComputeReduceGroupId(documentId),
+						ReduceKey = reduceKey
+					});
 				}
 				return doc;
 			});
@@ -78,7 +83,11 @@ namespace Raven.Database.Indexing
 					var reduceKey = ReduceKeyToString(reduceValue);
 					var docId = mappedResultFromDocument.Key.ToString();
 
-					reduceKeysToDelete.Remove((string)reduceKey);
+					reduceKeysToDelete.Remove(new ReduceKeyAndGroupId
+					{
+						ReduceGroupId = ComputeReduceGroupId(docId),
+						ReduceKey = reduceKey
+					});
 
 					var data = GetMapedData(doc);
 
@@ -224,13 +233,17 @@ namespace Raven.Database.Indexing
 		{
 			context.TransactionaStorage.Batch(actions =>
 			{
-				var reduceKeys = new HashSet<string>();
+				var reduceKeys = new HashSet<ReduceKeyAndGroupId>();
 				foreach (var key in keys)
 				{
 					var reduceKeysFromDocuments = actions.MappedResults.DeleteMappedResultsForDocumentId(key, name);
 					foreach (var reduceKey in reduceKeysFromDocuments)
 					{
-						reduceKeys.Add(reduceKey);
+						reduceKeys.Add(new ReduceKeyAndGroupId
+						{
+							ReduceGroupId = ComputeReduceGroupId(key),
+							ReduceKey = reduceKey
+						});
 					}
 				}
 				actions.Tasks.AddTask(new ReduceTask
@@ -257,7 +270,7 @@ namespace Raven.Database.Indexing
 									IEnumerable<object> mappedResults,
 									WorkContext context,
 									IStorageActionsAccessor actions,
-									string[] reduceKeys)
+									ReduceKeyAndGroupId[] reduceKeys)
 		{
 			var count = 0;
 			Write(context, (indexWriter, analyzer) =>
@@ -266,24 +279,17 @@ namespace Raven.Database.Indexing
 				var batchers = context.IndexUpdateTriggers.Select(x => x.CreateBatcher(name))
 					.Where(x => x != null)
 					.ToList();
-				foreach (var reduceKey in reduceKeys)
+				
+				DeleteExistingReduceKeysFromLuceneIndex(context, reduceKeys, indexWriter, batchers);
+				// reduce and save all the groups
+				foreach (var doc in RobustEnumerationReduce(mappedResults, viewGenerator.ReduceDefinition, actions, context))
 				{
-					var entryKey = reduceKey;
-					indexWriter.DeleteDocuments(new Term(Abstractions.Data.Constants.ReduceKeyFieldName, entryKey.ToLowerInvariant()));
-					batchers.ApplyAndIgnoreAllErrors(
-						exception =>
-						{
-							logIndexing.WarnException(
-								string.Format("Error when executed OnIndexEntryDeleted trigger for index '{0}', key: '{1}'",
-								              name, entryKey),
-								exception);
-							context.AddError(name,
-							                 entryKey,
-							                 exception.Message
-								);
-						},
-						trigger => trigger.OnIndexEntryDeleted(entryKey));
+					// how do I decide how to do this? 
+					// based on what?
+					string reduceKeyAsString = ExtractReduceKey(viewGenerator, doc);
+					actions.MappedResults.PutReduceResult(reduceKeyAsString, );
 				}
+
 				PropertyDescriptorCollection properties = null;
 				var anonymousObjectToLuceneDocumentConverter = new AnonymousObjectToLuceneDocumentConverter(indexDefinition);
 				var luceneDoc = new Document();
@@ -331,7 +337,29 @@ namespace Raven.Database.Indexing
 				return true;
 			});
 			logIndexing.Debug(() => string.Format("Reduce resulted in {0} entries for {1} for reduce keys: {2}", count, name,
-							  string.Join(", ", reduceKeys)));
+							  string.Join(", ", reduceKeys.Select(x=>x.ToString()))));
+		}
+
+		private void DeleteExistingReduceKeysFromLuceneIndex(WorkContext context, ReduceKeyAndGroupId[] reduceKeys, IndexWriter indexWriter, List<AbstractIndexUpdateTriggerBatcher> batchers)
+		{
+			foreach (var reduceKey in reduceKeys)
+			{
+				var entryKey = reduceKey;
+				indexWriter.DeleteDocuments(new Term(Abstractions.Data.Constants.ReduceKeyFieldName, entryKey.ReduceKey.ToLowerInvariant()));
+				batchers.ApplyAndIgnoreAllErrors(
+					exception =>
+					{
+						logIndexing.WarnException(
+							string.Format("Error when executed OnIndexEntryDeleted trigger for index '{0}', key: '{1}'",
+							              name, entryKey),
+							exception);
+						context.AddError(name,
+						                 entryKey.ReduceKey,
+						                 exception.Message
+							);
+					},
+					trigger => trigger.OnIndexEntryDeleted(entryKey.ReduceKey));
+			}
 		}
 
 

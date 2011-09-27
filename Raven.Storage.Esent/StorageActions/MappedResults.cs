@@ -42,16 +42,22 @@ namespace Raven.Storage.Esent.StorageActions
 			foreach (var item in getMappedResultsParams)
 			{
 				Api.MakeKey(session, MappedResults, item.ViewAndReduceKeyHashed, MakeKeyGrbit.NewKey);
+				Api.MakeKey(session, MappedResults, item.ReduceKey.ReduceGroupId, MakeKeyGrbit.None);
 				if (Api.TrySeek(session, MappedResults, SeekGrbit.SeekEQ) == false)
 					continue;
 
 				Api.MakeKey(session, MappedResults, item.ViewAndReduceKeyHashed, MakeKeyGrbit.NewKey);
+				Api.MakeKey(session, MappedResults, item.ReduceKey.ReduceGroupId, MakeKeyGrbit.None);
 				Api.JetSetIndexRange(session, MappedResults, SetIndexRangeGrbit.RangeUpperLimit | SetIndexRangeGrbit.RangeInclusive);
 				do
 				{
 					// we need to check that we don't have hash collisions
 					var currentReduceKey = Api.RetrieveColumnAsString(session, MappedResults, tableColumnsCache.MappedResultsColumns["reduce_key"]);
-					if (currentReduceKey != item.ReduceKey)
+					if (currentReduceKey != item.ReduceKey.ReduceKey)
+						continue;
+
+					var currentReduceGroupId = Api.RetrieveColumnAsInt32(session, MappedResults, tableColumnsCache.MappedResultsColumns["reduce_group_id"]).Value;
+					if(currentReduceGroupId != item.ReduceKey.ReduceGroupId)
 						continue;
 			
 					var currentView = Api.RetrieveColumnAsString(session, MappedResults, tableColumnsCache.MappedResultsColumns["view"]);
