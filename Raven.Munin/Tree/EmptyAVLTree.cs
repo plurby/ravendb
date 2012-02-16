@@ -14,13 +14,19 @@ namespace Raven.Munin.Tree
 		private readonly IComparer<TKey> comparer;
 		private readonly Func<TKey, TKey> deepCopyKey;
 		private readonly Func<TValue, TValue> deepCopyValue;
+		private readonly int version;
 
+		public int Version
+		{
+			get { return version; }
+		}
 
-		public EmptyAVLTree(IComparer<TKey> comparer, Func<TKey, TKey> deepCopyKey, Func<TValue, TValue> deepCopyValue)
+		public EmptyAVLTree(IComparer<TKey> comparer, Func<TKey, TKey> deepCopyKey, Func<TValue, TValue> deepCopyValue, int prevVer)
 		{
 			this.comparer = comparer;
 			this.deepCopyValue = deepCopyValue;
 			this.deepCopyKey = deepCopyKey;
+			this.version = prevVer + 1;
 		}
 
 		// IBinaryTree
@@ -105,13 +111,13 @@ namespace Raven.Munin.Tree
 
 		public IBinarySearchTree<TKey, TValue> Add(TKey key, TValue value)
 		{
-			return new AVLTree<TKey, TValue>(comparer,deepCopyKey, deepCopyValue, key, value, this, this);
+			return new AVLTree<TKey, TValue>(comparer, deepCopyKey, deepCopyValue, key, value, this, this, Version);
 		}
 
 		public IBinarySearchTree<TKey, TValue> AddOrUpdate(TKey key, TValue value, Func<TKey, TValue, TValue> updateValueFactory)
 		{
 			// we don't udpate, so we don't care about the update value factory
-			return new AVLTree<TKey, TValue>(comparer, deepCopyKey, deepCopyValue, key, value, this, this);
+			return new AVLTree<TKey, TValue>(comparer, deepCopyKey, deepCopyValue, key, value, this, this, Version);
 		}
 
 		public IBinarySearchTree<TKey, TValue> TryRemove(TKey key, out bool removed, out TValue value)

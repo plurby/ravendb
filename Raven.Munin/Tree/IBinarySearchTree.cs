@@ -31,6 +31,7 @@ namespace Raven.Munin.Tree
 		IEnumerable<TValue> ValuesInOrder { get; }
 		IEnumerable<TValue> ValuesInReverseOrder { get; }
 		IEnumerable<KeyValuePair<TKey, TValue>> Pairs { get; }
+		int Version { get; }
 		IBinarySearchTree<TKey, TValue> Search(TKey key);
 		IEnumerable<TValue> GreaterThan(TKey gtKey);
 		IEnumerable<TValue> LessThan(TKey ltKey);

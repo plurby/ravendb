@@ -7,6 +7,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using NLog;
 using Raven.Json.Linq;
 using Raven.Munin.Tree;
 
@@ -54,7 +55,7 @@ namespace Raven.Munin
 		{
 			IComparable actualKey = transform(key);
 			Index = Index.AddOrUpdate(actualKey,
-				new EmptyAVLTree<RavenJToken, RavenJToken>(RavenJTokenComparer.Instance, token => token.CloneToken(), token => token.CloneToken()).Add(key, key),
+				new EmptyAVLTree<RavenJToken, RavenJToken>(RavenJTokenComparer.Instance, token => token.CloneToken(), token => token.CloneToken(), Index.Version).Add(key, key),
 				(comparable, tree) => tree.Add(key, key));
 		}
 

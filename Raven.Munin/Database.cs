@@ -28,7 +28,7 @@ namespace Raven.Munin
 
 		public readonly ThreadLocal<Guid> CurrentTransactionId = new ThreadLocal<Guid>(() => Guid.Empty);
 
-		internal IList<PersistentDictionaryState> DictionaryStates
+		public IList<PersistentDictionaryState> DictionaryStates
 		{
 			get { return persistentSource.DictionariesStates; }
 		}
@@ -352,9 +352,12 @@ namespace Raven.Munin
 
 		public Table Add(Table dictionary)
 		{
-			tables.Add(dictionary);
-			DictionaryStates.Add(null);
-			dictionary.Initialize(persistentSource, tables.Count - 1, this, CurrentTransactionId);
+			persistentSource.Write(stream =>
+			{
+				tables.Add(dictionary);
+				DictionaryStates.Add(null);
+				dictionary.Initialize(persistentSource, tables.Count - 1, this, CurrentTransactionId);
+			});
 			return dictionary;
 		}
 

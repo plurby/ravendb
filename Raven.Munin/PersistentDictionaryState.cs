@@ -27,7 +27,7 @@ namespace Raven.Munin
 				Key = file.Key.CloneToken(),
 				Position = file.Position,
 				Size = file.Size
-			});
+			},0);
 		}
 	}
 }

@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Linq;
+using NLog;
 
 namespace Raven.Munin
 {
@@ -44,10 +45,21 @@ namespace Raven.Munin
 
 		public IList<PersistentDictionaryState> DictionariesStates
 		{
-			get { return CurrentStates ?? globalStates; }
+			get
+			{
+				if (CurrentStates == null)
+				{
+					if (Debugger.IsAttached)
+						return globalStates;
+					throw new InvalidOperationException("You are not inside a Read/Write");
+				}
+				return CurrentStates;
+			}
 		}
 
 		protected abstract Stream CreateClonedStreamForReadOnlyPurposes();
+
+		private Logger logger = LogManager.GetCurrentClassLogger();
 
 		public T Read<T>(Func<Stream, T> readOnlyAction)
 		{
@@ -58,6 +70,7 @@ namespace Raven.Munin
 			CurrentStates = oldValue ?? globalStates;
 			try
 			{
+				logger.Debug("Using CurrentStates: {0}", CurrentStates.GetHashCode());
 				Stream stream;
 				using (pool.Use(out stream))
 					return readOnlyAction(stream);
@@ -84,10 +97,10 @@ namespace Raven.Munin
 			}
 		}
 
-
+		object locker = new object();
 		public void Write(Action<Stream> readWriteAction)
 		{
-			lock (this)
+			lock (locker)
 			{
 				if (disposed)
 					throw new ObjectDisposedException("Cannot access persistent source after it was disposed");

@@ -114,20 +114,23 @@ namespace Raven.Tests.Storage.MultiThreaded
 				DocumentDatabase.TransactionalStorage.Batch(accessor =>
 				{
 					var documents = accessor.Documents.GetDocumentsAfter(lastEtagSeen, 128)
-						.Where(x => x != null)
 						.Select(doc =>
 						{
+							if(doc == null)
+								log.Debug("Empty doc");
 							DocumentRetriever.EnsureIdInMetadata(doc);
 							return doc;
 						})
+						.Where(x => x != null)
 						.ToArray();
 
 					if (documents.Length == 0)
 						return;
 
+					var old = lastEtagSeen;
 					lastEtagSeen = documents.Last().Etag.Value;
-
-					log.Debug("Docs: {0}", string.Join(", ", documents.Select(x => x.Key)));
+					log.Debug("Etag: {0} -> {1}", old, lastEtagSeen);
+					log.Debug("Found docs: {0}", string.Join(", ", documents.Select(x => x.Key)));
 
 					getDocumentsState.Enqueue(new GetDocumentState(lastEtagSeen, documents.Length));
 				});
