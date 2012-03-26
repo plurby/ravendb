@@ -11,6 +11,7 @@ using System.IO;
 using System.Runtime.Caching;
 using System.Runtime.ConstrainedExecution;
 using System.Threading;
+using Lucene.Net.Index;
 using Microsoft.Isam.Esent.Interop;
 using NLog;
 using Raven.Abstractions.Data;
@@ -22,10 +23,11 @@ using Raven.Database.Impl;
 using Raven.Database.Plugins;
 using System.Linq;
 using Raven.Database.Storage;
-using Raven.Json.Linq;
 using Raven.Storage.Esent.Backup;
+using Raven.Storage.Esent.Indexing;
 using Raven.Storage.Esent.SchemaUpdates;
 using Raven.Storage.Esent.StorageActions;
+using Directory = Lucene.Net.Store.Directory;
 
 namespace Raven.Storage.Esent
 {
@@ -45,6 +47,7 @@ namespace Raven.Storage.Esent
 		private readonly IDocumentCacher documentCacher;
 
 		private static readonly Logger log = LogManager.GetCurrentClassLogger();
+		private IndexingStorage indexingStorage;
 
 		[ImportMany]
 		public OrderedPartCollection<ISchemaUpdate> Updaters { get; set; }
@@ -83,6 +86,8 @@ namespace Raven.Storage.Esent
 			new TransactionalStorageConfigurator(configuration).LimitSystemCache();
 
 			Api.JetCreateInstance(out instance, database + Guid.NewGuid());
+
+			indexingStorage = new IndexingStorage(configuration.IndexStoragePath, configuration.Settings);
 		}
 
 		public TableColumnsCache TableColumnsCache
@@ -111,7 +116,8 @@ namespace Raven.Storage.Esent
 			{
 				if (disposed)
 					return;
-				
+				if(indexingStorage != null)
+					indexingStorage.Dispose();
 				disposed = true;
 				GC.SuppressFinalize(this);
 				current.Dispose();
@@ -167,6 +173,21 @@ namespace Raven.Storage.Esent
 			return e.Error == JET_err.InvalidInstance;
 		}
 
+		public Directory CreateIndexDirectory(string directoryPath)
+		{
+			return new EsentDirectory(indexingStorage, directoryPath);
+		}
+
+		public MergeScheduler CreateMergeScheduler()
+		{
+			return new EsentMergeConcurrentMergeScheduler(indexingStorage);
+		}
+
+		public void IndexingBatch(Action action)
+		{
+			indexingStorage.Batch(accessor => action());
+		}
+
 		#endregion
 
 		public bool Initialize(IUuidGenerator uuidGenerator)
@@ -211,6 +232,8 @@ namespace Raven.Storage.Esent
 				SetIdFromDb();
 
 				tableColumnsCache.InitColumDictionaries(instance, database);
+
+				indexingStorage.Initialize();
 
 				return newDb;
 			}

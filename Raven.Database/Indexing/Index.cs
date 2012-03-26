@@ -50,13 +50,14 @@ namespace Raven.Database.Indexing
 
 		private readonly AbstractViewGenerator viewGenerator;
 		private readonly InMemoryRavenConfiguration configuration;
+		private readonly ITransactionalStorage transactionalStorage;
 		private readonly object writeLock = new object();
 		private volatile bool disposed;
 		private IndexWriter indexWriter;
 		private readonly IndexSearcherHolder currentIndexSearcherHolder = new IndexSearcherHolder();
 
 
-		protected Index(Directory directory, string name, IndexDefinition indexDefinition, AbstractViewGenerator viewGenerator, InMemoryRavenConfiguration configuration)
+		protected Index(Directory directory, string name, IndexDefinition indexDefinition, AbstractViewGenerator viewGenerator, InMemoryRavenConfiguration configuration, ITransactionalStorage transactionalStorage)
 		{
 			if (directory == null) throw new ArgumentNullException("directory");
 			if (name == null) throw new ArgumentNullException("name");
@@ -67,6 +68,7 @@ namespace Raven.Database.Indexing
 			this.indexDefinition = indexDefinition;
 			this.viewGenerator = viewGenerator;
 			this.configuration = configuration;
+			this.transactionalStorage = transactionalStorage;
 			logIndexing.Debug("Creating index for {0}", name);
 			this.directory = directory;
 
@@ -215,62 +217,65 @@ namespace Raven.Database.Indexing
 				throw new ObjectDisposedException("Index " + name + " has been disposed");
 			lock (writeLock)
 			{
-				bool shouldRecreateSearcher;
-				var toDispose = new List<Action>();
-				Analyzer searchAnalyzer = null;
-				try
+				transactionalStorage.IndexingBatch(() =>
 				{
+					bool shouldRecreateSearcher;
+					var toDispose = new List<Action>();
+					Analyzer searchAnalyzer = null;
 					try
 					{
-						searchAnalyzer = CreateAnalyzer(new LowerCaseKeywordAnalyzer(), toDispose);
-					}
-					catch (Exception e)
-					{
-						context.AddError(name, "Creating Analyzer", e.ToString());
-						throw;
-					}
-
-					if (indexWriter == null)
-					{
-						indexWriter = CreateIndexWriter(directory);
-					}
-
-					var stats = new IndexingWorkStats();
-					try
-					{
-						shouldRecreateSearcher = action(indexWriter, searchAnalyzer, stats);
-						foreach (IIndexExtension indexExtension in indexExtensions.Values)
+						try
 						{
-							indexExtension.OnDocumentsIndexed(currentlyIndexDocuments);
+							searchAnalyzer = CreateAnalyzer(new LowerCaseKeywordAnalyzer(), toDispose);
+						}
+						catch (Exception e)
+						{
+							context.AddError(name, "Creating Analyzer", e.ToString());
+							throw;
+						}
+
+						if (indexWriter == null)
+						{
+							indexWriter = CreateIndexWriter(directory);
+						}
+
+						var stats = new IndexingWorkStats();
+						try
+						{
+							shouldRecreateSearcher = action(indexWriter, searchAnalyzer, stats);
+							foreach (IIndexExtension indexExtension in indexExtensions.Values)
+							{
+								indexExtension.OnDocumentsIndexed(currentlyIndexDocuments);
+							}
+						}
+						catch (Exception e)
+						{
+							context.AddError(name, null, e.ToString());
+							throw;
+						}
+
+						UpdateIndexingStats(context, stats);
+
+						WriteTempIndexToDiskIfNeeded(context);
+
+						if (configuration.TransactionMode == TransactionMode.Safe)
+						{
+							Flush(optimize: false);
 						}
 					}
-					catch (Exception e)
+					finally
 					{
-						context.AddError(name, null, e.ToString());
-						throw;
+						currentlyIndexDocuments.Clear();
+						if (searchAnalyzer != null)
+							searchAnalyzer.Close();
+						foreach (Action dispose in toDispose)
+						{
+							dispose();
+						}
 					}
-
-					UpdateIndexingStats(context, stats);
-
-					WriteTempIndexToDiskIfNeeded(context);
-
-					if (configuration.TransactionMode == TransactionMode.Safe)
-					{
-						Flush(optimize: false);
-					}
-				}
-				finally
-				{
-					currentlyIndexDocuments.Clear();
-					if (searchAnalyzer != null)
-						searchAnalyzer.Close();
-					foreach (Action dispose in toDispose)
-					{
-						dispose();
-					}
-				}
-				if (shouldRecreateSearcher)
-					RecreateSearcher();
+					if (shouldRecreateSearcher)
+						RecreateSearcher();
+				});
 			}
 		}
 
@@ -294,13 +299,13 @@ namespace Raven.Database.Indexing
 			});
 		}
 
-		private static IndexWriter CreateIndexWriter(Directory directory)
+		private IndexWriter CreateIndexWriter(Directory directory)
 		{
 			var indexWriter = new IndexWriter(directory, new StopAnalyzer(Version.LUCENE_29), IndexWriter.MaxFieldLength.UNLIMITED);
 			var mergeScheduler = indexWriter.GetMergeScheduler();
 			if (mergeScheduler != null)
 				mergeScheduler.Close();
-			indexWriter.SetMergeScheduler(new ErrorLoggingConcurrentMergeScheduler());
+			indexWriter.SetMergeScheduler(transactionalStorage.CreateMergeScheduler());
 			return indexWriter;
 		}
 

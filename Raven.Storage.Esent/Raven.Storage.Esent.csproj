@@ -41,6 +41,9 @@
     <Reference Include="Esent.Interop">
       <HintPath>..\SharedLibs\Esent.Interop.dll</HintPath>
     </Reference>
+    <Reference Include="Lucene.Net">
+      <HintPath>..\SharedLibs\Lucene.Net.dll</HintPath>
+    </Reference>
     <Reference Include="Newtonsoft.Json, Version=4.0.8.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\Newtonsoft.Json.4.0.8\lib\net40\Newtonsoft.Json.dll</HintPath>
@@ -63,6 +66,14 @@
     <Compile Include="Backup\EsentBackup.cs" />
     <Compile Include="Backup\RestoreOperation.cs" />
     <Compile Include="EsentExtension.cs" />
+    <Compile Include="Indexing\DelegatingStream.cs" />
+    <Compile Include="Indexing\EsentDirectory.cs" />
+    <Compile Include="Indexing\EsentMergeConcurrentMergeScheduler.cs" />
+    <Compile Include="Indexing\IndexingSchemaCreator.cs" />
+    <Compile Include="Indexing\IndexingStorage.cs" />
+    <Compile Include="Indexing\IndexingStorageActionsAccessor.cs" />
+    <Compile Include="Indexing\StorageConfigurator.cs" />
+    <Compile Include="Indexing\IndexingTablesColumnsCache.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SchemaCreator.cs" />
     <Compile Include="SchemaUpdates\From35To36.cs" />

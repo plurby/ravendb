@@ -40,17 +40,23 @@ namespace Raven.Database.Queries
 
 
 			IndexSearcher currentSearcher;
-			using(_database.IndexStorage.GetCurrentIndexSearcher(indexName,out currentSearcher))
+			SuggestionQueryResult executeSuggestionQuery = null;
+			_database.TransactionalStorage.IndexingBatch(() =>
 			{
-				var indexReader = currentSearcher.GetIndexReader();
+				using (_database.IndexStorage.GetCurrentIndexSearcher(indexName, out currentSearcher))
+				{
+					var indexReader = currentSearcher.GetIndexReader();
 
-				var suggestionQueryIndexExtension = new SuggestionQueryIndexExtension(GetStringDistance(suggestionQuery), suggestionQuery.Field, suggestionQuery.Accuracy);
-				suggestionQueryIndexExtension.Init(indexReader);
+					var suggestionQueryIndexExtension = new SuggestionQueryIndexExtension(GetStringDistance(suggestionQuery), suggestionQuery.Field, suggestionQuery.Accuracy);
+					suggestionQueryIndexExtension.Init(indexReader);
 
-				_database.IndexStorage.SetIndexExtension(indexName, indexExtensionKey, suggestionQueryIndexExtension);
+					_database.IndexStorage.SetIndexExtension(indexName, indexExtensionKey, suggestionQueryIndexExtension);
 
-				return suggestionQueryIndexExtension.Query(suggestionQuery);
-			}
+					executeSuggestionQuery = suggestionQueryIndexExtension.Query(suggestionQuery);
+				}
+			});
+			return executeSuggestionQuery;
+
 		}
 
 		private static StringDistance GetStringDistance(SuggestionQuery query)

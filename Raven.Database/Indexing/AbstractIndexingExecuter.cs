@@ -97,7 +97,7 @@ namespace Raven.Database.Indexing
 			if (lastFlushedWorkCounter == workCounter || context.DoWork == false)
 				return;
 			lastFlushedWorkCounter = workCounter;
-			FlushAllIndexes();
+			context.TransactionaStorage.IndexingBatch(FlushAllIndexes);
 		}
 
 		protected abstract void FlushAllIndexes();

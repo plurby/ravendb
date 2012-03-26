@@ -22,8 +22,8 @@ namespace Raven.Database.Indexing
 {
 	public class SimpleIndex : Index
 	{
-		public SimpleIndex(Directory directory, string name, IndexDefinition indexDefinition, AbstractViewGenerator viewGenerator, InMemoryRavenConfiguration configuration)
-			: base(directory, name, indexDefinition, viewGenerator, configuration)
+		public SimpleIndex(Directory directory, string name, IndexDefinition indexDefinition, AbstractViewGenerator viewGenerator, InMemoryRavenConfiguration configuration, ITransactionalStorage transactionalStorage)
+			: base(directory, name, indexDefinition, viewGenerator, configuration, transactionalStorage)
 		{
 		}
 

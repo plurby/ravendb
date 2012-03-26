@@ -32,8 +32,8 @@ namespace Raven.Database.Indexing
 {
 	public class MapReduceIndex : Index
 	{
-		public MapReduceIndex(Directory directory, string name, IndexDefinition indexDefinition, AbstractViewGenerator viewGenerator, InMemoryRavenConfiguration configuration)
-			: base(directory, name, indexDefinition, viewGenerator, configuration)
+		public MapReduceIndex(Directory directory, string name, IndexDefinition indexDefinition, AbstractViewGenerator viewGenerator, InMemoryRavenConfiguration configuration, ITransactionalStorage transactionalStorage)
+			: base(directory, name, indexDefinition, viewGenerator, configuration, transactionalStorage)
 		{
 		}
 

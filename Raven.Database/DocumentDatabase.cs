@@ -737,7 +737,7 @@ namespace Raven.Database
 			Guid resultEtag = Guid.Empty;
 			var nonAuthoritativeInformation = false;
 			TransactionalStorage.Batch(
-				actions =>
+				actions => TransactionalStorage.IndexingBatch(() =>
 				{
 					var viewGenerator = IndexDefinitionStorage.GetViewGenerator(index);
 					if (viewGenerator == null)
@@ -756,23 +756,24 @@ namespace Raven.Database
 					var docRetriever = new DocumentRetriever(actions, ReadTriggers);
 					var indexDefinition = GetIndexDefinition(index);
 					var fieldsToFetch = new FieldsToFetch(query.FieldsToFetch, query.AggregationOperation,
-														  viewGenerator.ReduceDefinition == null
-															? Constants.DocumentIdFieldName
-															: Constants.ReduceKeyFieldName);
-					Func<IndexQueryResult, bool> shouldIncludeInResults = 
+					                                      viewGenerator.ReduceDefinition == null
+					                                      	? Constants.DocumentIdFieldName
+					                                      	: Constants.ReduceKeyFieldName);
+					Func<IndexQueryResult, bool> shouldIncludeInResults =
 						result => docRetriever.ShouldIncludeResultInQuery(result, indexDefinition, fieldsToFetch);
-					var collection = from queryResult in IndexStorage.Query(index, query, shouldIncludeInResults, fieldsToFetch, IndexQueryTriggers)
-									 select docRetriever.RetrieveDocumentForQuery(queryResult, indexDefinition, fieldsToFetch)
-										 into doc
-										 where doc != null
-										 let _ = nonAuthoritativeInformation |= (doc.NonAuthoritativeInformation  ?? false)
-										 select doc;
+					var collection =
+						from queryResult in IndexStorage.Query(index, query, shouldIncludeInResults, fieldsToFetch, IndexQueryTriggers)
+						select docRetriever.RetrieveDocumentForQuery(queryResult, indexDefinition, fieldsToFetch)
+						into doc
+						where doc != null
+						let _ = nonAuthoritativeInformation |= (doc.NonAuthoritativeInformation ?? false)
+						select doc;
 
 					var transformerErrors = new List<string>();
 					IEnumerable<RavenJObject> results;
-					if (query.SkipTransformResults == false && 
-						query.PageSize > 0 && // maybe they just want the stats?
-						viewGenerator.TransformResultsDefinition != null)
+					if (query.SkipTransformResults == false &&
+					    query.PageSize > 0 && // maybe they just want the stats?
+					    viewGenerator.TransformResultsDefinition != null)
 					{
 						var dynamicJsonObjects = collection.Select(x => new DynamicJsonObject(x.ToJson())).ToArray();
 						var robustEnumerator = new RobustEnumerator(dynamicJsonObjects.Length)
@@ -780,7 +781,7 @@ namespace Raven.Database
 							OnError =
 								(exception, o) =>
 								transformerErrors.Add(string.Format("Doc '{0}', Error: {1}", Index.TryGetDocKey(o),
-														 exception.Message))
+								                                    exception.Message))
 						};
 						results =
 							robustEnumerator.RobustEnumeration(
@@ -797,10 +798,11 @@ namespace Raven.Database
 
 					if (transformerErrors.Count > 0)
 					{
-						throw new InvalidOperationException("The transform results function failed.\r\n" + string.Join("\r\n", transformerErrors));
+						throw new InvalidOperationException("The transform results function failed.\r\n" +
+						                                    string.Join("\r\n", transformerErrors));
 					}
+				}));
 
-				});
 			return new QueryResult
 			{
 				IndexName = index,

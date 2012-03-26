@@ -13,6 +13,7 @@ using Lucene.Net.Store;
 using Raven.Abstractions.Indexing;
 using Raven.Database.Config;
 using Raven.Database.Indexing;
+using Raven.Storage.Managed;
 using Raven.Tests.Indexes;
 using Xunit;
 using Version = Lucene.Net.Util.Version;
@@ -59,7 +60,9 @@ namespace Raven.Tests.Bugs.Indexing
 			                                                        		{"f_License", SortOptions.Int},
 			                                                        	}
 
-			}, new MapOnlyView(), new InMemoryRavenConfiguration());
+			}, new MapOnlyView(), new InMemoryRavenConfiguration(),
+			                                  new TransactionalStorage(new InMemoryRavenConfiguration(), () =>
+			                                  { }));
 
 			var perFieldAnalyzerWrapper = simpleIndex.CreateAnalyzer(new LowerCaseKeywordAnalyzer(), new List<Action>());
 

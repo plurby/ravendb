@@ -28,25 +28,27 @@ namespace Raven.Database.Queries
 
 			var results = new Dictionary<string, IEnumerable<FacetValue>>();
 
-			IndexSearcher currentIndexSearcher;
-			using (database.IndexStorage.GetCurrentIndexSearcher(index, out currentIndexSearcher))
+			database.TransactionalStorage.IndexingBatch(() =>
 			{
-				foreach (var facet in facets)
+				IndexSearcher currentIndexSearcher;
+				using (database.IndexStorage.GetCurrentIndexSearcher(index, out currentIndexSearcher))
 				{
-					switch (facet.Mode)
+					foreach (var facet in facets)
 					{
-						case FacetMode.Default:
-							HandleTermsFacet(index, facet, indexQuery, currentIndexSearcher, results);
-							break;
-						case FacetMode.Ranges:
-							HandleRangeFacet(index, facet, indexQuery, currentIndexSearcher, results);
-							break;
-						default:
-							throw new ArgumentException(string.Format("Could not understand '{0}'", facet.Mode));
+						switch (facet.Mode)
+						{
+							case FacetMode.Default:
+								HandleTermsFacet(index, facet, indexQuery, currentIndexSearcher, results);
+								break;
+							case FacetMode.Ranges:
+								HandleRangeFacet(index, facet, indexQuery, currentIndexSearcher, results);
+								break;
+							default:
+								throw new ArgumentException(string.Format("Could not understand '{0}'", facet.Mode));
+						}
 					}
 				}
-
-			}
+			});
 
 			return results;
 		}

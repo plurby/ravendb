@@ -46,9 +46,11 @@ namespace Raven.Database.Indexing
 		private static readonly Logger log = LogManager.GetCurrentClassLogger();
 		private static readonly Logger startupLog = LogManager.GetLogger(typeof (IndexStorage).FullName + ".Startup");
 		private readonly Analyzer dummyAnalyzer = new SimpleAnalyzer();
+		private ITransactionalStorage transactionalStorage;
 
 		public IndexStorage(IndexDefinitionStorage indexDefinitionStorage, InMemoryRavenConfiguration configuration, DocumentDatabase documentDatabase)
 		{
+			transactionalStorage = documentDatabase.TransactionalStorage;
 			this.indexDefinitionStorage = indexDefinitionStorage;
 			this.configuration = configuration;
 			path = configuration.IndexStoragePath;
@@ -125,31 +127,33 @@ namespace Raven.Database.Indexing
 			{
 				var indexDirectory = indexName ?? IndexDefinitionStorage.FixupIndexName(indexDefinition.Name, path);
 				var indexFullPath = Path.Combine(path, MonoHttpUtility.UrlEncode(indexDirectory));
-				directory = FSDirectory.Open(new DirectoryInfo(indexFullPath));
+				directory = transactionalStorage.CreateIndexDirectory(indexFullPath);
 
-				if (!IndexReader.IndexExists(directory))
+				transactionalStorage.IndexingBatch(() =>
 				{
-					if(createIfMissing == false)
-						throw new InvalidOperationException("Index does not exists: " + indexDirectory);
-
-					//creating index structure if we need to
-					new IndexWriter(directory, dummyAnalyzer, IndexWriter.MaxFieldLength.UNLIMITED).Close();
-				}
-				else
-				{
-					if (directory.FileExists("write.lock")) // we had an unclean shutdown
+					if (!IndexReader.IndexExists(directory))
 					{
-						if(configuration.ResetIndexOnUncleanShutdown)
-							throw new InvalidOperationException("Rude shutdown detected on: " + indexDirectory);
+						if (createIfMissing == false)
+							throw new InvalidOperationException("Index does not exists: " + indexDirectory);
 
-						CheckIndexAndRecover(directory, indexDirectory);
-						IndexWriter.Unlock(directory);
+						//creating index structure if we need to
+						new IndexWriter(directory, dummyAnalyzer, IndexWriter.MaxFieldLength.UNLIMITED).Close();
 					}
-				}
+					else
+					{
+						if (directory.FileExists("write.lock")) // we had an unclean shutdown
+						{
+							if (configuration.ResetIndexOnUncleanShutdown)
+								throw new InvalidOperationException("Rude shutdown detected on: " + indexDirectory);
+
+							CheckIndexAndRecover(directory, indexDirectory);
+							IndexWriter.Unlock(directory);
+						}
+					}
+				});
 			}
 
 			return directory;
-
 		}
 
 		private static void CheckIndexAndRecover(Lucene.Net.Store.Directory directory, string indexDirectory)
@@ -185,7 +189,8 @@ namespace Raven.Database.Indexing
 
 		internal Lucene.Net.Store.Directory MakeRAMDirectoryPhysical(RAMDirectory ramDir, string indexName)
 		{
-			var newDir = FSDirectory.Open(new DirectoryInfo(Path.Combine(path, MonoHttpUtility.UrlEncode(IndexDefinitionStorage.FixupIndexName(indexName, path)))));
+			var directoryPath = Path.Combine(path, MonoHttpUtility.UrlEncode(IndexDefinitionStorage.FixupIndexName(indexName, path)));
+			var newDir = transactionalStorage.CreateIndexDirectory(directoryPath);
 			Lucene.Net.Store.Directory.Copy(ramDir, newDir, true);
 			return newDir;
 		}
@@ -193,9 +198,16 @@ namespace Raven.Database.Indexing
 		private Index CreateIndexImplementation(string directoryPath, IndexDefinition indexDefinition, Lucene.Net.Store.Directory directory)
 		{
 			var viewGenerator = indexDefinitionStorage.GetViewGenerator(indexDefinition.Name);
-			var indexImplementation = indexDefinition.IsMapReduce
-										? (Index)new MapReduceIndex(directory, directoryPath, indexDefinition, viewGenerator, configuration)
-										: new SimpleIndex(directory, directoryPath, indexDefinition, viewGenerator, configuration);
+			Index indexImplementation = null;
+
+			transactionalStorage.IndexingBatch(() =>
+			{
+				indexImplementation = indexDefinition.IsMapReduce
+								? (Index)new MapReduceIndex(directory, directoryPath, indexDefinition, viewGenerator, configuration, transactionalStorage)
+								: new SimpleIndex(directory, directoryPath, indexDefinition, viewGenerator, configuration, transactionalStorage);
+			});
+		
+
 
 			configuration.Container.SatisfyImportsOnce(indexImplementation);
 

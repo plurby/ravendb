@@ -4,6 +4,8 @@
 // </copyright>
 //-----------------------------------------------------------------------
 using System;
+using Lucene.Net.Index;
+using Lucene.Net.Store;
 using Raven.Database.Impl;
 
 namespace Raven.Database.Storage
@@ -23,5 +25,9 @@ namespace Raven.Database.Storage
 
 		string FriendlyName { get; }
 		bool HandleException(Exception exception);
+
+		Directory CreateIndexDirectory(string directoryPath);
+		MergeScheduler CreateMergeScheduler();
+		void IndexingBatch(Action action);
 	}
 }

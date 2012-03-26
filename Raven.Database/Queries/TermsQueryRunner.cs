@@ -26,38 +26,41 @@ namespace Raven.Database.Queries
 			if(index == null) throw new ArgumentNullException("index");
 			
 			var result = new HashSet<string>();
-			IndexSearcher currentIndexSearcher;
-			using(database.IndexStorage.GetCurrentIndexSearcher(index, out currentIndexSearcher))
+			database.TransactionalStorage.IndexingBatch(() =>
 			{
-				var termEnum = currentIndexSearcher.GetIndexReader().Terms(new Term(field, fromValue ?? string.Empty));
-				try
+				IndexSearcher currentIndexSearcher;
+				using (database.IndexStorage.GetCurrentIndexSearcher(index, out currentIndexSearcher))
 				{
-					if (string.IsNullOrEmpty(fromValue) == false) // need to skip this value
+					var termEnum = currentIndexSearcher.GetIndexReader().Terms(new Term(field, fromValue ?? string.Empty));
+					try
 					{
-						while (termEnum.Term() == null || fromValue.Equals(termEnum.Term().Text()))
+						if (string.IsNullOrEmpty(fromValue) == false) // need to skip this value
 						{
+							while (termEnum.Term() == null || fromValue.Equals(termEnum.Term().Text()))
+							{
+								if (termEnum.Next() == false)
+									return;
+							}
+						}
+						while (termEnum.Term() == null ||
+							field.Equals(termEnum.Term().Field()))
+						{
+							if (termEnum.Term() != null)
+								result.Add(termEnum.Term().Text());
+
+							if (result.Count >= pageSize)
+								break;
+
 							if (termEnum.Next() == false)
-								return result;
+								break;
 						}
 					}
-					while (termEnum.Term() == null || 
-						field.Equals(termEnum.Term().Field()))
+					finally
 					{
-						if (termEnum.Term() != null)
-							result.Add(termEnum.Term().Text());
-
-						if (result.Count >= pageSize)
-							break;
-
-						if (termEnum.Next() == false)
-							break;
+						termEnum.Close();
 					}
 				}
-				finally
-				{
-					termEnum.Close();
-				}
-			}
+			});
 
 			return result;
 		}

@@ -9,7 +9,8 @@ using System.ComponentModel.Composition;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
-using NLog;
+using Lucene.Net.Index;
+using Lucene.Net.Store;
 using Newtonsoft.Json.Linq;
 using Raven.Abstractions;
 using Raven.Abstractions.Data;
@@ -22,6 +23,7 @@ using Raven.Database.Storage;
 using Raven.Munin;
 using Raven.Storage.Managed.Backup;
 using Raven.Storage.Managed.Impl;
+using Directory = System.IO.Directory;
 
 namespace Raven.Storage.Managed
 {
@@ -200,6 +202,23 @@ namespace Raven.Storage.Managed
 		public bool HandleException(Exception exception)
 		{
 			return false;
+		}
+
+		public Lucene.Net.Store.Directory CreateIndexDirectory(string directoryPath)
+		{
+			if(PersistenceSource is MemoryPersistentSource)
+				return new RAMDirectory();
+			return FSDirectory.Open(new DirectoryInfo(directoryPath));
+		}
+
+		public MergeScheduler CreateMergeScheduler()
+		{
+			return new ErrorLoggingMergeScheduler();
+		}
+
+		public void IndexingBatch(Action action)
+		{
+			action();
 		}
 
 		private void MaybeOnIdle(object _)
