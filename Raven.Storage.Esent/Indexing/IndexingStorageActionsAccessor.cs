@@ -83,10 +83,11 @@ namespace Raven.Storage.Esent.Indexing
 		{
 			Api.JetSetCurrentIndex(session, Files, "by_path");
 			Api.MakeKey(session, Files, directory, Encoding.Unicode, MakeKeyGrbit.NewKey);
-			if (Api.TrySeek(session, Files, SeekGrbit.SeekEQ) == false)
+			if (Api.TrySeek(session, Files, SeekGrbit.SeekGE) == false)
 				yield break;
 			Api.MakeKey(session, Files, directory, Encoding.Unicode, MakeKeyGrbit.NewKey);
-			Api.JetSetIndexRange(session, Files, SetIndexRangeGrbit.RangeInclusive | SetIndexRangeGrbit.RangeUpperLimit);
+			if(Api.TrySetIndexRange(session, Files, SetIndexRangeGrbit.RangeInclusive | SetIndexRangeGrbit.RangeUpperLimit) == false)
+				yield break;
 			do
 			{
 				yield return Api.RetrieveColumnAsString(session, Files, indexingTablesColumnsCache.FilesColumns["name"], Encoding.Unicode);
