@@ -38,7 +38,6 @@ namespace Raven.Storage.Esent.Indexing
 
 		public override long Seek(long offset, SeekOrigin origin)
 		{
-			accessor.GoToFileBookmark(bookmark);
 			return stream.Seek(offset, origin);
 		}
 
@@ -62,6 +61,7 @@ namespace Raven.Storage.Esent.Indexing
 
 		public override void Write(byte[] buffer, int offset, int count)
 		{
+			accessor.GoToFileBookmark(bookmark);
 			if (write == false)
 				throw new IOException("Cannot write to this stream");
 			using (var update = accessor.BeginFileUpdate())
