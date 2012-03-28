@@ -104,6 +104,7 @@ namespace Raven.Storage.Esent.Indexing
 		public class StreamIndexInput : IndexInput
 		{
 			private readonly Stream stream;
+			private bool isClone;
 
 			public StreamIndexInput(Stream stream)
 			{
@@ -131,9 +132,17 @@ namespace Raven.Storage.Esent.Indexing
 				while (total < len);
 			}
 
+			public override Object Clone()
+			{
+				var clone = (StreamIndexInput)base.Clone();
+				clone.isClone = true;
+				return clone;
+			}
+			
 			public override void Close()
 			{
-				stream.Close();
+				if (!isClone)
+				  stream.Close();
 			}
 
 			public override long GetFilePointer()
