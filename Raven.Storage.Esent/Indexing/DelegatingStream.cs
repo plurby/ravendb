@@ -10,94 +10,113 @@ namespace Raven.Storage.Esent.Indexing
 {
 	public class DelegatingStream : Stream
 	{
-		private Stream stream;
-		private readonly IndexingStorageActionsAccessor accessor;
-		private readonly byte[] bookmark;
-		private bool write;
-
-		public DelegatingStream(IndexingStorageActionsAccessor accessor, byte[] bookmark, bool write, Stream stream)
+		private ColumnStream Stream
 		{
-			this.accessor = accessor;
+			get
+			{
+				// note that we rely on the fact that we don't need to dispose ColumnStream
+				var indexingStorageActionsAccessor = indexingStorage.GetCurrentBatch();
+				return new ColumnStream(indexingStorageActionsAccessor.Session, indexingStorageActionsAccessor.Files, filesColumn)
+				{
+					Position = position
+				};
+			}
+		}
+		private readonly IndexingStorage indexingStorage;
+		private readonly byte[] bookmark;
+		private readonly bool write;
+		private readonly Table files;
+		private readonly JET_COLUMNID filesColumn;
+		private long position;
+
+		public DelegatingStream(IndexingStorage indexingStorage, byte[] bookmark, bool write, JET_COLUMNID filesColumn)
+		{
+			this.indexingStorage = indexingStorage;
 			this.bookmark = bookmark;
 			this.write = write;
-			this.stream = stream;
+			this.files = files;
+			this.filesColumn = filesColumn;
 		}
 
+		private IndexingStorageActionsAccessor Accessor
+		{
+			get { return indexingStorage.GetCurrentBatch(); }
+		}
 
 		public override void Flush()
 		{
-			accessor.GoToFileBookmark(bookmark);
+			Accessor.GoToFileBookmark(bookmark);
 			if (write == false)
 				throw new IOException("Cannot write to this stream");
-			using (var update = accessor.BeginFileUpdate())
+			using (var update = Accessor.BeginFileUpdate())
 			{
-				stream.Flush();
+				Stream.Flush();
 				update.Save();
 			}
 		}
 
 		public override long Seek(long offset, SeekOrigin origin)
 		{
-			return stream.Seek(offset, origin);
+			return position = Stream.Seek(offset, origin);
 		}
 
 		public override void SetLength(long value)
 		{
-			accessor.GoToFileBookmark(bookmark);
+			Accessor.GoToFileBookmark(bookmark);
 			if(write == false)
 				throw new IOException("Cannot write to this stream");
-			using(var update= accessor.BeginFileUpdate())
+			using(var update= Accessor.BeginFileUpdate())
 			{
-				stream.SetLength(value);
+				Stream.SetLength(value);
 				update.Save();
 			}
 		}
 
 		public override int Read(byte[] buffer, int offset, int count)
 		{
-			accessor.GoToFileBookmark(bookmark);
-			return stream.Read(buffer, offset, count);
+			Accessor.GoToFileBookmark(bookmark);
+			return Stream.Read(buffer, offset, count);
 		}
 
 		public override void Write(byte[] buffer, int offset, int count)
 		{
-			accessor.GoToFileBookmark(bookmark);
+			Accessor.GoToFileBookmark(bookmark);
 			if (write == false)
 				throw new IOException("Cannot write to this stream");
-			using (var update = accessor.BeginFileUpdate())
+			using (var update = Accessor.BeginFileUpdate())
 			{
-				stream.Write(buffer, offset, count);
+				Stream.Write(buffer, offset, count);
 				update.Save();
 			}
 		}
 
 		public override bool CanRead
 		{
-			get { return stream.CanRead; }
+			get { return Stream.CanRead; }
 		}
 
 		public override bool CanSeek
 		{
-			get { return stream.CanSeek; }
+			get { return Stream.CanSeek; }
 		}
 
 		public override bool CanWrite
 		{
-			get { return stream.CanWrite && write; }
+			get { return Stream.CanWrite && write; }
 		}
 
 		public override long Length
 		{
 			get
 			{
-				accessor.GoToFileBookmark(bookmark);
-				return stream.Length;
+				Accessor.GoToFileBookmark(bookmark);
+				return Stream.Length;
 			}
 		}
 		public override long Position
 		{
-			get { return stream.Position; }
-			set { stream.Position = value; }
+			get { return position; }
+			set { position = Stream.Position = value; }
 		}
 	}
 }

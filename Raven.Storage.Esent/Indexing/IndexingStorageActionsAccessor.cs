@@ -20,8 +20,19 @@ namespace Raven.Storage.Esent.Indexing
 
 		private Table files, locks, details;
 		private readonly Transaction transaction;
+		private readonly IndexingStorage indexingStorage;
+		private bool disposed;
 
-		private Table Files
+		public Session Session
+		{
+			get
+			{
+				if (disposed)
+					throw new ObjectDisposedException("IndexingStorageActionsAccessor");
+				return session;
+			}
+		}
+		public Table Files
 		{
 			get { return files ?? (files = new Table(session, database, "files", OpenTableGrbit.None)); }
 		}
@@ -37,8 +48,9 @@ namespace Raven.Storage.Esent.Indexing
 		}
 
 
-		public IndexingStorageActionsAccessor(IndexingTablesColumnsCache indexingTablesColumnsCache, JET_INSTANCE instance, string databaseName)
+		public IndexingStorageActionsAccessor(IndexingStorage indexingStorage,IndexingTablesColumnsCache indexingTablesColumnsCache, JET_INSTANCE instance, string databaseName)
 		{
+			this.indexingStorage = indexingStorage;
 			this.indexingTablesColumnsCache = indexingTablesColumnsCache;
 			try
 			{
@@ -57,7 +69,7 @@ namespace Raven.Storage.Esent.Indexing
 		[DebuggerNonUserCode]
 		public void Dispose()
 		{
-
+			disposed = true;
 			if (details != null)
 				details.Dispose();
 			if (files != null)
@@ -204,8 +216,7 @@ namespace Raven.Storage.Esent.Indexing
 				MoveToFile(directory, name);
 			}
 			var bookmark = Api.GetBookmark(session, Files);
-			var stream = new ColumnStream(session, Files, indexingTablesColumnsCache.FilesColumns["data"]);
-			return new BufferedStream(new DelegatingStream(this, bookmark, write, stream));
+			return new BufferedStream(new DelegatingStream(indexingStorage, bookmark, write, indexingTablesColumnsCache.FilesColumns["data"]));
 		}
 
 		public void ReleaseLock(string directory, string name)

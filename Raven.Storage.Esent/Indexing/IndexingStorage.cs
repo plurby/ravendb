@@ -239,7 +239,7 @@ namespace Raven.Storage.Esent.Indexing
 
 			try
 			{
-				using(var storageActionsAccessor = new IndexingStorageActionsAccessor(indexingTablesColumnsCache, instance, database))
+				using(var storageActionsAccessor = new IndexingStorageActionsAccessor(this, indexingTablesColumnsCache, instance, database))
 				{
 					current.Value = storageActionsAccessor;
 					action(storageActionsAccessor);
