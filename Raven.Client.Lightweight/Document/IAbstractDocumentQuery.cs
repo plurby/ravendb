@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using Raven.Abstractions.Data;
+using Raven.Client.Linq;
 
 namespace Raven.Client.Document
 {
@@ -143,21 +144,21 @@ namespace Raven.Client.Document
 		void WhereIn(string fieldName, IEnumerable<object> values);
 
 		/// <summary>
-		///   Avoid using WhereConatins(), use Search() instead
+		///   Avoid using WhereContains(), use Search() instead
 		/// </summary>
-		[Obsolete("Avoid using WhereConatins(), use Search() instead")]
+		[Obsolete("Avoid using WhereContains(), use Search() instead")]
 		void WhereContains(string fieldName, object value);
 
 		/// <summary>
-		///   Avoid using WhereConatins(), use Search() instead
+		///   Avoid using WhereContains(), use Search() instead
 		/// </summary>
-		[Obsolete("Avoid using WhereConatins(), use Search() instead")]
+		[Obsolete("Avoid using WhereContains(), use Search() instead")]
 		void WhereContains(string fieldName, params object [] values);
 
 		/// <summary>
-		///   Avoid using WhereConatins(), use Search() instead
+		///   Avoid using WhereContains(), use Search() instead
 		/// </summary>
-		[Obsolete("Avoid using WhereConatins(), use Search() instead")]
+		[Obsolete("Avoid using WhereContains(), use Search() instead")]
 		void WhereContains(string fieldName, IEnumerable<object> values);
 
 		/// <summary>
@@ -306,7 +307,7 @@ namespace Raven.Client.Document
 		/// Perform a search for documents which fields that match the searchTerms.
 		/// If there is more than a single term, each of them will be checked independently.
 		/// </summary>
-		void Search(string fieldName, string searchTerms);
+		void Search(string fieldName, string searchTerms, EscapeQueryOptions escapeQueryOptions = EscapeQueryOptions.RawQuery);
 
 		/// <summary>
 		///   Returns a <see cref = "System.String" /> that represents this instance.

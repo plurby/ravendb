@@ -166,6 +166,7 @@ namespace Raven.Database.Indexing
 
 						CheckIndexAndRecover(directory, indexDirectory);
 						IndexWriter.Unlock(directory);
+						directory.DeleteFile("write.lock");
 					}
 				}
 			}
@@ -441,6 +442,13 @@ namespace Raven.Database.Indexing
 		public void SetIndexExtension(string indexName, string indexExtensionKey, IIndexExtension suggestionQueryIndexExtension)
 		{
 			GetIndexByName(indexName).SetExtension(indexExtensionKey, suggestionQueryIndexExtension);
+		}
+
+		public Index GetIndexInstance(string indexName)
+		{
+			return indexes.Where(index => System.String.Compare(index.Key, indexName, System.StringComparison.OrdinalIgnoreCase) == 0)
+				.Select(x => x.Value)
+				.FirstOrDefault();
 		}
 	}
 }

@@ -11,6 +11,7 @@ using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 #if !NET_3_5
 using Raven.Client.Connection.Async;
@@ -37,6 +38,9 @@ namespace Raven.Client.Document
 	/// </summary>
 	public abstract class AbstractDocumentQuery<T, TSelf> : IDocumentQueryCustomization, IRavenQueryInspector, IAbstractDocumentQuery<T>
 	{
+		protected bool isSpatialQuery;
+		protected double lat, lng, radius;
+
 		/// <summary>
 		/// Whatever to negate the next operation
 		/// </summary>
@@ -59,6 +63,8 @@ namespace Raven.Client.Document
 		protected readonly string indexName;
 
 		protected Func<IndexQuery, IEnumerable<object>, IEnumerable<object>> transformResultsFunc;
+
+		protected string defaultField;
 
 		private int currentClauseDepth;
 
@@ -338,6 +344,11 @@ namespace Raven.Client.Document
 			return this;
 		}
 
+		public void UsingDefaultField(string field)
+		{
+			defaultField = field;
+		}
+
 		/// <summary>
 		///   Includes the specified path in the query, loading the document specified in that path
 		/// </summary>
@@ -480,7 +491,7 @@ namespace Raven.Client.Document
 				queryOperation = InitializeQueryOperation(DatabaseCommands.OperationsHeaders.Set);
 			}
 
-			var lazyQueryOperation = new LazyQueryOperation<T>(queryOperation, afterQueryExecutedCallback);
+			var lazyQueryOperation = new LazyQueryOperation<T>(queryOperation, afterQueryExecutedCallback, includes);
 
 			return ((DocumentSession)theSession).AddLazyOperation(lazyQueryOperation, onEval);
 		}
@@ -853,9 +864,9 @@ If you really want to do in memory filtering on the data returned from the query
 		}
 
 		/// <summary>
-		///   Avoid using WhereConatins(), use Search() instead
+		///   Avoid using WhereContains(), use Search() instead
 		/// </summary>
-		[Obsolete("Avoid using WhereConatins(), use Search() instead")]
+		[Obsolete("Avoid using WhereContains(), use Search() instead")]
 		public void WhereContains(string fieldName, object value)
 		{
 			WhereEquals(new WhereParams
@@ -868,9 +879,9 @@ If you really want to do in memory filtering on the data returned from the query
 		}
 
 		/// <summary>
-		///   Avoid using WhereConatins(), use Search() instead
+		///   Avoid using WhereContains(), use Search() instead
 		/// </summary>
-		[Obsolete("Avoid using WhereConatins(), use Search() instead")]
+		[Obsolete("Avoid using WhereContains(), use Search() instead")]
 		public void WhereContains(string fieldName, params object[] values)
 		{
 			if (values == null || values.Length == 0)
@@ -929,9 +940,9 @@ If you really want to do in memory filtering on the data returned from the query
 		}
 
 		/// <summary>
-		///   Avoid using WhereConatins(), use Search() instead
+		///   Avoid using WhereContains(), use Search() instead
 		/// </summary>
-		[Obsolete("Avoid using WhereConatins(), use Search() instead")]
+		[Obsolete("Avoid using WhereContains(), use Search() instead")]
 		public void WhereContains(string fieldName, IEnumerable<object> values)
 		{
 			WhereContains(fieldName, values.ToArray());
@@ -1438,6 +1449,26 @@ If you really want to do in memory filtering on the data returned from the query
 		/// <returns></returns>
 		protected virtual IndexQuery GenerateIndexQuery(string query)
 		{
+			if(isSpatialQuery)
+			{
+				return new SpatialIndexQuery
+				{
+					GroupBy = groupByFields,
+					AggregationOperation = aggregationOp,
+					Query = query,
+					PageSize = pageSize ?? 128,
+					Start = start,
+					Cutoff = cutoff,
+					CutoffEtag = cutoffEtag,
+					SortedFields = orderByFields.Select(x => new SortedField(x)).ToArray(),
+					FieldsToFetch = projectionFields,
+					Latitude = lat,
+					Longitude = lng,
+					Radius = radius,
+					DefaultField = defaultField
+				};
+			}
+
 			return new IndexQuery
 			{
 				GroupBy = groupByFields,
@@ -1448,20 +1479,49 @@ If you really want to do in memory filtering on the data returned from the query
 				Cutoff = cutoff,
 				CutoffEtag = cutoffEtag,
 				SortedFields = orderByFields.Select(x => new SortedField(x)).ToArray(),
-				FieldsToFetch = projectionFields
+				FieldsToFetch = projectionFields,
+				DefaultField = defaultField
 			};
 		}
+
+		private static readonly Regex espacePostfixWildcard = new Regex(@"\\\*(\s|$)", 
+#if !SILVERLIGHT
+			RegexOptions.Compiled
+#else
+			RegexOptions.None
+#endif
+
+			);
 
 		/// <summary>
 		/// Perform a search for documents which fields that match the searchTerms.
 		/// If there is more than a single term, each of them will be checked independently.
 		/// </summary>
-		public void Search(string fieldName, string searchTerms)
+		public void Search(string fieldName, string searchTerms, EscapeQueryOptions escapeQueryOptions = EscapeQueryOptions.RawQuery)
 		{
 			lastEquality = new KeyValuePair<string, string>(fieldName, "<<"+searchTerms+">>");
 			theQueryText.Append(' ');
 			
 			NegateIfNeeded();
+			switch (escapeQueryOptions)
+			{
+				case EscapeQueryOptions.EscapeAll:
+					searchTerms = RavenQuery.Escape(searchTerms, false, false);
+					break;
+				case EscapeQueryOptions.AllowPostfixWildcard:
+					searchTerms = RavenQuery.Escape(searchTerms, false, false);
+					searchTerms = espacePostfixWildcard.Replace(searchTerms, "*");
+					break;
+				case EscapeQueryOptions.AllowAllWildcards:
+					searchTerms = RavenQuery.Escape(searchTerms, false, false);
+					searchTerms = searchTerms.Replace("\\*", "*");
+					break;
+				case EscapeQueryOptions.RawQuery:
+					break;
+				default:
+					throw new ArgumentOutOfRangeException("escapeQueryOptions", "Value: "  + escapeQueryOptions);
+			}
+
 			theQueryText.Append(fieldName).Append(":").Append("<<").Append(searchTerms).Append(">>");
 		}
 
