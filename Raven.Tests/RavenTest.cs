@@ -118,10 +118,6 @@ namespace Raven.Tests
 				Thread.Sleep(25);
 		}
 
-		protected virtual void ConfigureServer(RavenConfiguration configuration)
-		{
-		}
-
 		protected void WaitForUserToContinueTheTest()
 		{
 			if (Debugger.IsAttached == false)
@@ -146,13 +142,13 @@ namespace Raven.Tests
 
 		}
 
-		protected RavenDbServer GetNewServer(int port = 8079, string dataDirectory = "Data")
+		protected RavenDbServer GetNewServer(int port = 8079, string dataDirectory = "Data", bool runInMemory = true)
 		{
 			var ravenConfiguration = new RavenConfiguration
 									 {
 										 Port = port,
 										 DataDirectory = dataDirectory,
-										 RunInMemory = true,
+										 RunInMemory = runInMemory,
 										 AnonymousUserAccessMode = AnonymousUserAccessMode.All
 									 };
 
@@ -168,11 +164,11 @@ namespace Raven.Tests
 			{
 				using (var documentStore = new DocumentStore
 											{
+												Url = "http://localhost:" + port,
 												Conventions =
 													{
 														FailoverBehavior = FailoverBehavior.FailImmediately
 													},
-												Url = "http://localhost:" + port
 											}.Initialize())
 				{
 					CreateDefaultIndexes(documentStore);

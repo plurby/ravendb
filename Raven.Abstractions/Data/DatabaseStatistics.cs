@@ -10,6 +10,8 @@ namespace Raven.Abstractions.Data
 {
 	public class DatabaseStatistics
 	{
+		public Guid LastDocEtag { get; set; }
+		public Guid LastAttachmentEtag { get; set; }
 		public int CountOfIndexes { get; set; }
 
 		public long ApproximateTaskCount { get; set; }
@@ -19,6 +21,8 @@ namespace Raven.Abstractions.Data
 		public string[] StaleIndexes { get; set; }
 
 		public int CurrentNumberOfItemsToIndexInSingleBatch { get; set; }
+		
+		public int CurrentNumberOfItemsToReduceInSingleBatch { get; set; }
 
 		public IndexStats[] Indexes { get; set; }
 

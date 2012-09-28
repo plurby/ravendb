@@ -25,6 +25,7 @@ namespace Raven.Database.Indexing
 		public IndexingExecuter(ITransactionalStorage transactionalStorage, WorkContext context, TaskScheduler scheduler)
 			: base(transactionalStorage, context, scheduler)
 		{
+			autoTuner = new IndexBatchSizeAutoTuner(context);
 		}
 
 		protected override bool IsIndexStale(IndexStats indexesStat, IStorageActionsAccessor actions)
@@ -52,12 +53,13 @@ namespace Raven.Database.Indexing
 		}
 
 
-		protected override void ExecuteIndxingWork(IList<IndexToWorkOn> indexesToWorkOn)
+		protected override void ExecuteIndexingWork(IList<IndexToWorkOn> indexesToWorkOn)
 		{
 			indexesToWorkOn = context.Configuration.IndexingScheduler.FilterMapIndexes(indexesToWorkOn);
 
 			var lastIndexedGuidForAllIndexes = indexesToWorkOn.Min(x => new ComparableByteArray(x.LastIndexedEtag.ToByteArray())).ToGuid();
 
+			TimeSpan indexingDuration = TimeSpan.Zero;
 			JsonDocument[] jsonDocs = null;
 			try
 			{
@@ -73,8 +75,6 @@ namespace Raven.Database.Indexing
 						.ToArray();
 				});
 
-				
-
 				log.Debug("Found a total of {0} documents that requires indexing since etag: {1}",
 										  jsonDocs.Length, lastIndexedGuidForAllIndexes);
 				
@@ -82,6 +82,7 @@ namespace Raven.Database.Indexing
 				{
 					var result = FilterIndexes(indexesToWorkOn, jsonDocs).ToList();
 					indexesToWorkOn = result.Select(x => x.Item1).ToList();
+					var sw = Stopwatch.StartNew();
 					BackgroundTaskExecuter.Instance.ExecuteAll(context.Configuration, scheduler, result, (indexToWorkOn,_) =>
 					{
 						var index = indexToWorkOn.Item1;
@@ -90,6 +91,7 @@ namespace Raven.Database.Indexing
 							actions => IndexDocuments(actions, index.IndexName, docs));
 					
 					});
+					indexingDuration = sw.Elapsed;
 				}
 			}
 			finally
@@ -115,7 +117,7 @@ namespace Raven.Database.Indexing
 						}
 					});
 
-					autoTuner.AutoThrottleBatchSize(jsonDocs.Length, jsonDocs.Sum(x => x.SerializedSizeOnDisk));
+					autoTuner.AutoThrottleBatchSize(jsonDocs.Length, jsonDocs.Sum(x => x.SerializedSizeOnDisk), indexingDuration);
 				}
 			}
 		}

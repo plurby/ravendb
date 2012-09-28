@@ -69,15 +69,15 @@ namespace Raven.Studio.Models
 				SetCurrentDocumentKey(docId);
 				DatabaseCommands.GetAsync(docId)
 					.ContinueOnSuccessInTheUIThread(newdoc =>
-					                                	{
-					                                		if (newdoc == null)
-					                                		{
-					                                			HandleDocumentNotFound();
-					                                			return;
-					                                		}
-					                                		document.Value = newdoc;
-					                                		isLoaded = true;
-					                                	})
+														{
+															if (newdoc == null)
+															{
+																HandleDocumentNotFound();
+																return;
+															}
+															document.Value = newdoc;
+															isLoaded = true;
+														})
 					.Catch();
 				return;
 			}
@@ -193,11 +193,12 @@ namespace Raven.Studio.Models
 			}
 		}
 
-		public void SetCurrentDocumentKey(string docId)
+		public void SetCurrentDocumentKey(string docId, bool dontOpenNewTag = false)
 		{
 			if (DocumentKey != null && DocumentKey != docId)
-				UrlUtil.Navigate("/edit?id=" + docId);
+				UrlUtil.Navigate("/edit?id=" + docId, dontOpenNewTag);
 
+			Mode = DocumentMode.DocumentWithId;
 			DocumentKey = Key = docId;
 		}
 
@@ -313,12 +314,12 @@ namespace Raven.Studio.Models
 			{
 				double byteCount = Encoding.UTF8.GetByteCount(JsonData) + Encoding.UTF8.GetByteCount(JsonMetadata);
 				string sizeTerm = "Bytes";
-				if (byteCount > 1024 * 1024)
+				if (byteCount >= 1024 * 1024)
 				{
 					sizeTerm = "MBytes";
-					byteCount = byteCount / 1024 * 1024;
+					byteCount = byteCount / (1024 * 1024);
 				}
-				else if (byteCount > 1024)
+				else if (byteCount >= 1024)
 				{
 					sizeTerm = "KBytes";
 					byteCount = byteCount / 1024;
@@ -366,9 +367,9 @@ namespace Raven.Studio.Models
 				foreach (var source in referencesIds.Cast<Match>().Select(x => x.Groups[1].Value).Distinct())
 				{
 					DateTime time;
-					if(DateTime.TryParse(source, out time))
+					if (DateTime.TryParse(source, out time))
 						continue;
-					
+
 					References.Add(new LinkModel
 					{
 						Title = source,
@@ -380,6 +381,8 @@ namespace Raven.Studio.Models
 
 		private void UpdateRelated()
 		{
+			if (string.IsNullOrEmpty(Key))
+				return;
 			DatabaseCommands.GetDocumentsStartingWithAsync(Key + Seperator, 0, 15)
 				.ContinueOnSuccess(items =>
 								   {
@@ -485,7 +488,7 @@ namespace Raven.Studio.Models
 
 		public ICommand ToggleSearch
 		{
-			get{return new ChangeFieldValueCommand<EditableDocumentModel>(this, x => x.SearchEnabled = !x.searchEnabled); }
+			get { return new ChangeFieldValueCommand<EditableDocumentModel>(this, x => x.SearchEnabled = !x.searchEnabled); }
 		}
 
 		private class RefreshDocumentCommand : Command
@@ -561,13 +564,11 @@ namespace Raven.Studio.Models
 				{
 					doc = RavenJObject.Parse(document.JsonData);
 					metadata = RavenJObject.Parse(document.JsonMetadata);
-					//if (document.Key != null && document.Key.Contains("/") &&
-					//	metadata.Value<string>(Constants.RavenEntityName) == null)
-					if(document.Key != null && Seperator != null)
+					if (document.Key != null && Seperator != null && metadata.Value<string>(Constants.RavenEntityName) == null)
 					{
 						var entityName = document.Key.Split(new[] { Seperator }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-					
-					if (entityName != null && entityName.Length > 1)
+
+						if (entityName != null && entityName.Length > 1)
 						{
 							metadata[Constants.RavenEntityName] = char.ToUpper(entityName[0]) + entityName.Substring(1);
 						}
@@ -585,12 +586,17 @@ namespace Raven.Studio.Models
 
 				document.UpdateMetadata(metadata);
 				ApplicationModel.Current.AddNotification(new Notification("Saving document " + document.Key + " ..."));
-				DatabaseCommands.PutAsync(document.Key, document.Etag, doc, metadata)
+				var url = new UrlParser(UrlUtil.Url);
+				var docId = url.GetQueryParam("id");
+				Guid? etag = string.Equals(docId , document.Key, StringComparison.InvariantCultureIgnoreCase) ? 
+					document.Etag : Guid.Empty;
+			
+				DatabaseCommands.PutAsync(document.Key, etag, doc, metadata)
 					.ContinueOnSuccess(result =>
 					{
 						ApplicationModel.Current.AddNotification(new Notification("Document " + result.Key + " saved"));
 						document.Etag = result.ETag;
-						document.SetCurrentDocumentKey(result.Key);
+						document.SetCurrentDocumentKey(result.Key, dontOpenNewTag: true);
 					})
 					.ContinueOnSuccess(() => new RefreshDocumentCommand(document).Execute(null))
 					.Catch(exception => ApplicationModel.Current.AddNotification(new Notification(exception.Message)));

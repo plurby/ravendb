@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Raven.Abstractions.Data;
@@ -14,10 +15,12 @@ namespace Raven.Database.Indexing
 		public ReducingExecuter(ITransactionalStorage transactionalStorage, WorkContext context, TaskScheduler scheduler)
 			: base(transactionalStorage, context, scheduler)
 		{
+			autoTuner = new ReduceBatchSizeAutoTuner(context);
 		}
 
 		protected void HandleReduceForIndex(IndexToWorkOn indexToWorkOn)
 		{
+			TimeSpan reduceDuration= TimeSpan.Zero;
 			List<MappedResultInfo> reduceKeyAndEtags = null;
 			try
 			{
@@ -28,10 +31,7 @@ namespace Raven.Database.Indexing
 							indexToWorkOn.IndexName,
 							indexToWorkOn.LastIndexedEtag,
 							loadData: false,
-							// for reduce operations, we use the smaller value, rather than tuning stuff on the fly
-							// the reason for that is that we may have large number of map values to reduce anyway, 
-							// so we don't want to try to load too much all at once.
-							take: context.Configuration.InitialNumberOfItemsToIndexInSingleBatch
+							take: autoTuner.NumberOfItemsToIndexInSingleBatch
 						)
 						.ToList();
 
@@ -43,11 +43,13 @@ namespace Raven.Database.Indexing
 							log.Debug("No reduce keys found for {0}", indexToWorkOn.IndexName);
 					}
 
+					var sw = Stopwatch.StartNew();
 					new ReduceTask
 					{
 						Index = indexToWorkOn.IndexName,
 						ReduceKeys = reduceKeyAndEtags.Select(x => x.ReduceKey).Distinct().ToArray(),
 					}.Execute(context);
+					reduceDuration = sw.Elapsed;
 				});
 			}
 			finally
@@ -67,6 +69,8 @@ namespace Raven.Database.Indexing
 							actions.Indexing.UpdateLastReduced(indexToWorkOn.IndexName, lastByEtag.Etag, lastByEtag.Timestamp);
 						}
 					});
+
+					autoTuner.AutoThrottleBatchSize(reduceKeyAndEtags.Count, reduceKeyAndEtags.Sum(x => x.Size), reduceDuration);
 				}
 			}
 		}
@@ -110,7 +114,7 @@ namespace Raven.Database.Indexing
 			};
 		}
 
-		protected override void ExecuteIndxingWork(IList<IndexToWorkOn> indexesToWorkOn)
+		protected override void ExecuteIndexingWork(IList<IndexToWorkOn> indexesToWorkOn)
 		{
 			BackgroundTaskExecuter.Instance.ExecuteAll(context.Configuration, scheduler, indexesToWorkOn, (indexToWorkOn, l) => HandleReduceForIndex(indexToWorkOn));
 		}
